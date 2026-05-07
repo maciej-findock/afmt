@@ -797,6 +797,7 @@ impl<'a> DocBuild<'a> for AnnotationArgumentList {
 pub struct BodyMember<M> {
     pub member: M,
     pub has_trailing_newline: bool, // already take comment nodes into consideration
+    pub has_leading_newline: bool,  // blank line between opening brace and first member
 }
 
 impl<M> BodyMember<M> {
@@ -804,7 +805,17 @@ impl<M> BodyMember<M> {
         Self {
             member,
             has_trailing_newline: Self::has_trailing_newline(node),
+            has_leading_newline: Self::has_leading_newline(node),
         }
+    }
+
+    fn has_leading_newline(node: &Node) -> bool {
+        if node.prev_named_sibling().is_some() {
+            return false;
+        }
+        node.parent().is_some_and(|parent| {
+            node.start_position().row > parent.start_position().row + 1
+        })
     }
 
     // take comment nodes into consideration

@@ -125,9 +125,17 @@ impl<'a> DocBuilder<'a> {
             return self.concat(vec![self.txt(open), self.nl(), self.txt(close)]);
         }
 
+        let leading = if self.preserve_newlines()
+            && elems.first().is_some_and(|m| m.has_leading_newline)
+        {
+            self.indent(self.empty_new_line())
+        } else {
+            self.indent(self.nl())
+        };
+
         let multi_line = self.concat(vec![
             self.txt(open),
-            self.indent(self.nl()),
+            leading,
             self.indent(self.intersperse_body_members(elems)),
             self.nl(),
             self.txt(close),
