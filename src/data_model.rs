@@ -2814,6 +2814,7 @@ impl<'a> DocBuild<'a> for ArrayCreationVariant {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         match self {
             Self::OnlyV { value } => {
+                result.push(b.txt(" "));
                 result.push(value.build(b));
             }
             Self::DD {

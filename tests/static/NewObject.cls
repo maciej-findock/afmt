@@ -50,9 +50,9 @@ class NewObject {
         && anotherSuperDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
       );
     Set<String> b = new Set<String> {};
-    Set<String> c = new Set<String>{ 'a', 'b' };
+    Set<String> c = new Set<String> { 'a', 'b' };
     Set<String> c =
-      new Set<String>{ 'Long string number one', 'Long string number two' };
+      new Set<String> { 'Long string number one', 'Long string number two' };
   }
 
   void newMapTest() {
@@ -152,12 +152,12 @@ class NewObject {
       };
     Map<String, List<String>> b =
       new Map<String, List<String>> {
-        'b' => new List<String>{ 'c', 'd', 'e' }
+        'b' => new List<String> { 'c', 'd', 'e' }
       };
     Map<List<String>, List<String>> c =
       new Map<List<String>, List<String>> {
-        new List<String>{ 'a' } => new List<String>{ 'b', 'c' },
-        new List<String>{ 'd' } => new List<String>{ 'e', 'f' }
+        new List<String> { 'a' } => new List<String> { 'b', 'c' },
+        new List<String> { 'd' } => new List<String> { 'e', 'f' }
       };
     List<List<String>> d = new List<List<String>>(5);
   }

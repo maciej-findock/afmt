@@ -15,14 +15,14 @@ class Ternary {
     List<String> a =
       (
         veryLongVariableNameThatWillSurelyBreak == 'Yes'
-        ? new List<String>{
+        ? new List<String> {
           'First One',
           'Second One',
           'Third One',
           'Fourth One',
           'Fifth One'
         }
-        : new List<String>{
+        : new List<String> {
           'First One',
           'Second One',
           'Third One',
@@ -33,14 +33,14 @@ class Ternary {
       );
 
     veryLongVariableNameThatWillSurelyBreak == 'Yes'
-    ? new List<String>{
+    ? new List<String> {
       'First One',
       'Second One',
       'Third One',
       'Fourth One',
       'Fifth One'
     }
-    : new List<String>{
+    : new List<String> {
       'First One',
       'Second One',
       'Third One',
