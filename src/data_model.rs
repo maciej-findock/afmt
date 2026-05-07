@@ -613,6 +613,7 @@ pub struct AssignmentExpression {
     pub op: ValueNode,
     pub right: Expression,
     pub is_right_child_a_query_node: bool,
+    rhs_on_same_line: bool,
     pub node_context: NodeContext,
 }
 
@@ -620,13 +621,17 @@ impl AssignmentExpression {
     pub fn new(node: Node) -> Self {
         assert_check(node, "assignment_expression");
 
+        let operator_node = node.c_by_n("operator");
         let right_child = node.c_by_n("right");
+        let rhs_on_same_line =
+            right_child.start_position().row == operator_node.start_position().row;
 
         Self {
             left: AssignmentLeft::new(node.c_by_n("left")),
-            op: ValueNode::new(node.c_by_n("operator")),
+            op: ValueNode::new(operator_node),
             right: Expression::new(right_child),
             is_right_child_a_query_node: is_query_expression(&right_child),
+            rhs_on_same_line,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -637,6 +642,11 @@ impl<'a> DocBuild<'a> for AssignmentExpression {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let mut docs = vec![self.left.build(b), b.txt(" "), self.op.build(b)];
             if self.is_right_child_a_query_node {
+                docs.push(b.txt(" "));
+                docs.push(self.right.build(b));
+                result.push(b.concat(docs));
+            } else if b.preserve_newlines() && self.rhs_on_same_line {
+                // Developer placed RHS on the same line as `=` — keep it there.
                 docs.push(b.txt(" "));
                 docs.push(self.right.build(b));
                 result.push(b.concat(docs));

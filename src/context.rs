@@ -126,6 +126,10 @@ impl Comment {
         self.metadata.has_prev_node
     }
 
+    pub fn dedent_levels(&self) -> u32 {
+        self.metadata.dedent_levels
+    }
+
     pub fn mark_as_printed(&self) {
         self.is_printed.set(true);
     }
@@ -231,6 +235,9 @@ pub struct CommentMetadata {
     has_empty_line_below: bool,
     has_prev_node: bool,
     is_followed_by_bracket_composite_node: bool,
+    // How many 4-space indent levels the comment sits to the left of its previous sibling.
+    // Used by preserve_newlines to render post-comments at the original column.
+    pub dedent_levels: u32,
 }
 
 impl CommentMetadata {
@@ -274,6 +281,19 @@ impl CommentMetadata {
             false
         };
 
+        // How many 4-space levels the comment sits to the left of its previous sibling.
+        let dedent_levels = if let Some(prev_node) = prev {
+            let prev_col = prev_node.start_position().column;
+            let comment_col = node.start_position().column;
+            if prev_col > comment_col {
+                ((prev_col - comment_col) / 4) as u32
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
         CommentMetadata {
             has_leading_content,
             has_trailing_content,
@@ -281,6 +301,7 @@ impl CommentMetadata {
             has_empty_line_below,
             has_prev_node,
             is_followed_by_bracket_composite_node,
+            dedent_levels,
         }
     }
 }

@@ -458,6 +458,12 @@ pub fn handle_post_comments<'a>(
             docs.push(b.txt(" "));
         } else if comment.has_newline_above() {
             docs.push(b.empty_new_line());
+        } else if b.preserve_newlines() && comment.dedent_levels() > 0 {
+            let mut nl = b.nl();
+            for _ in 0..comment.dedent_levels() {
+                nl = b.dedent(nl);
+            }
+            docs.push(nl);
         } else {
             docs.push(b.nl());
         }
