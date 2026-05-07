@@ -2,8 +2,8 @@ class A {
   // line comment
 
   /*
-  block comment
-  */
+block comment
+*/
   {
   }
 }

@@ -1,6 +1,6 @@
-/* Block Comment
-test 123
-*/
+/* Block Comment 
+        test 123
+      */
 class BlockTrailingCommentAfterClass {
   public BlockTrailingCommentsAfterClass() {
   }

@@ -182,6 +182,7 @@ impl<'a> DocBuild<'a> for MethodDeclaration {
 pub struct FormalParameters {
     pub formal_parameters: Vec<FormalParameter>,
     pub node_context: NodeContext,
+    is_multiline: bool,
 }
 
 impl FormalParameters {
@@ -194,9 +195,12 @@ impl FormalParameters {
             .map(FormalParameter::new)
             .collect();
 
+        let is_multiline = node.start_position().row != node.end_position().row;
+
         Self {
             formal_parameters,
             node_context: NodeContext::with_punctuation(&node),
+            is_multiline,
         }
     }
 }
@@ -209,7 +213,7 @@ impl<'a> DocBuild<'a> for FormalParameters {
             let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
             let open = Insertable::new(None, Some("("), Some(b.maybeline()));
             let close = Insertable::new(Some(b.maybeline()), Some(")"), None);
-            let doc = b.group_surround(&parameters_doc, sep, open, close);
+            let doc = b.group_surround_preserve(&parameters_doc, sep, open, close, self.is_multiline);
             result.push(doc);
         });
     }
@@ -524,6 +528,7 @@ impl<'a> DocBuild<'a> for FieldDeclaration {
 pub struct ArrayInitializer {
     initializers: Vec<VariableInitializer>,
     pub node_context: NodeContext,
+    is_multiline: bool,
 }
 
 impl ArrayInitializer {
@@ -536,9 +541,12 @@ impl ArrayInitializer {
             .map(|n| VariableInitializer::new(n))
             .collect();
 
+        let is_multiline = node.start_position().row != node.end_position().row;
+
         Self {
             initializers,
             node_context: NodeContext::with_punctuation(&node),
+            is_multiline,
         }
     }
 }
@@ -551,7 +559,7 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
             let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
             let open = Insertable::new(None, Some("{"), Some(b.softline()));
             let close = Insertable::new(Some(b.softline()), Some("}"), None);
-            let doc = b.group_surround(&docs, sep, open, close);
+            let doc = b.group_surround_preserve(&docs, sep, open, close, self.is_multiline);
             result.push(doc);
         });
     }
@@ -761,6 +769,7 @@ impl<'a> DocBuild<'a> for TypeList {
 pub struct ChainingContext {
     pub is_parent_a_chaining_node: bool,
     pub is_top_most_in_a_chain: bool,
+    pub is_multiline: bool,
 }
 
 #[derive(Debug)]
@@ -828,7 +837,15 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
 
                 // potential chaining scenario
                 if let Some(context) = context {
-                    if context.is_parent_a_chaining_node || context.is_top_most_in_a_chain {
+                    // When preserve_newlines is on and this chain link is single-line in source
+                    // (i.e. the `.method()` is on the same row as the object ends), skip the
+                    // maybeline break point. Applies to both intermediate and top-most links so
+                    // that e.g. `Type.forName(...).newInstance()` doesn't split at `Type`.
+                    let preserve_flat_chain = b.preserve_newlines() && !context.is_multiline;
+
+                    if !preserve_flat_chain
+                        && (context.is_parent_a_chaining_node || context.is_top_most_in_a_chain)
+                    {
                         docs.push(b.maybeline());
                     }
 
@@ -842,6 +859,9 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                     docs.push(arguments.build(b));
 
                     if context.is_top_most_in_a_chain {
+                        if preserve_flat_chain {
+                            return result.push(b.concat(docs));
+                        }
                         return result.push(b.group_indent_concat(docs));
                     }
 
@@ -972,6 +992,7 @@ impl<'a> DocBuild<'a> for TypeArguments {
 pub struct ArgumentList {
     pub expressions: Vec<Expression>,
     pub node_context: NodeContext,
+    is_multiline: bool,
 }
 
 impl ArgumentList {
@@ -982,9 +1003,12 @@ impl ArgumentList {
             .map(|n| Expression::new(n))
             .collect();
 
+        let is_multiline = node.start_position().row != node.end_position().row;
+
         Self {
             expressions,
             node_context: NodeContext::with_punctuation(&node),
+            is_multiline,
         }
     }
 }
@@ -997,7 +1021,7 @@ impl<'a> DocBuild<'a> for ArgumentList {
             let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
             let open = Insertable::new(None, Some("("), Some(b.maybeline()));
             let close = Insertable::new(Some(b.maybeline()), Some(")"), None);
-            let doc = b.group_surround(&docs, sep, open, close);
+            let doc = b.group_surround_preserve(&docs, sep, open, close, self.is_multiline);
             result.push(doc);
         });
     }
@@ -1203,6 +1227,7 @@ pub struct VariableDeclarator {
     pub op: Option<ValueNode>,
     pub value: Option<VariableInitializer>,
     pub is_value_child_a_query_node: bool,
+    is_value_on_new_line: bool,
     pub node_context: NodeContext,
 }
 
@@ -1217,11 +1242,22 @@ impl VariableDeclarator {
             VariableInitializer::Exp(Expression::new(n))
         });
 
+        let is_value_on_new_line = match (
+            node.try_c_by_k("assignment_operator"),
+            node.try_c_by_n("value"),
+        ) {
+            (Some(op_node), Some(val_node)) => {
+                val_node.start_position().row > op_node.start_position().row
+            }
+            _ => false,
+        };
+
         Self {
             name: ValueNode::new(node.c_by_n("name")),
             op,
             value,
             is_value_child_a_query_node,
+            is_value_on_new_line,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -1245,6 +1281,12 @@ impl<'a> DocBuild<'a> for VariableDeclarator {
             }
 
             if self.is_value_child_a_query_node {
+                docs.push(b.txt(" "));
+                docs.push(value.build(b));
+                result.push(b.concat(docs));
+            } else if b.preserve_newlines() && !self.is_value_on_new_line {
+                // Value was on same line as = in source: no break point at =.
+                // The value itself handles its own vertical layout.
                 docs.push(b.txt(" "));
                 docs.push(value.build(b));
                 result.push(b.concat(docs));
@@ -1407,14 +1449,20 @@ impl ParenthesizedExpression {
 impl<'a> DocBuild<'a> for ParenthesizedExpression {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            // to align with prettier apex
             result.push(b.txt("("));
-            let doc = b.concat(vec![
-                b.indent(b.maybeline()),
-                b.indent(self.exp.build(b)),
-                b.maybeline(),
-            ]);
-            result.push(b.group(doc));
+            if b.preserve_newlines() {
+                // Don't add an extra indent level inside parens — the inner
+                // expression manages its own vertical layout.
+                result.push(self.exp.build(b));
+            } else {
+                // to align with prettier apex
+                let doc = b.concat(vec![
+                    b.indent(b.maybeline()),
+                    b.indent(self.exp.build(b)),
+                    b.maybeline(),
+                ]);
+                result.push(b.group(doc));
+            }
             result.push(b.txt(")"));
         });
     }
@@ -2202,7 +2250,11 @@ impl<'a> DocBuild<'a> for FieldAccess {
             docs.push(self.object.build(b));
 
             if let Some(ref context) = self.context {
-                if context.is_parent_a_chaining_node || context.is_top_most_in_a_chain {
+                let preserve_flat_chain = b.preserve_newlines() && !context.is_multiline;
+
+                if !preserve_flat_chain
+                    && (context.is_parent_a_chaining_node || context.is_top_most_in_a_chain)
+                {
                     docs.push(b.maybeline());
                 }
             }
@@ -2210,15 +2262,16 @@ impl<'a> DocBuild<'a> for FieldAccess {
             docs.push(self.property_navigation.build(b));
             docs.push(self.field.build(b));
 
-            if self
-                .context
-                .as_ref()
-                .is_some_and(|context| context.is_top_most_in_a_chain)
-            {
-                result.push(b.group_indent_concat(docs));
-            } else {
-                result.push(b.concat(docs));
+            if let Some(ref context) = self.context {
+                if context.is_top_most_in_a_chain {
+                    let preserve_flat_chain = b.preserve_newlines() && !context.is_multiline;
+                    if preserve_flat_chain {
+                        return result.push(b.concat(docs));
+                    }
+                    return result.push(b.group_indent_concat(docs));
+                }
             }
+            result.push(b.concat(docs));
         });
     }
 }
@@ -2297,6 +2350,7 @@ impl<'a> DocBuild<'a> for EnumDeclaration {
 pub struct EnumBody {
     enum_constants: Vec<EnumConstant>,
     pub node_context: NodeContext,
+    is_multiline: bool,
 }
 
 impl EnumBody {
@@ -2309,9 +2363,12 @@ impl EnumBody {
             .map(|n| EnumConstant::new(n))
             .collect();
 
+        let is_multiline = node.start_position().row != node.end_position().row;
+
         Self {
             enum_constants,
             node_context: NodeContext::with_punctuation(&node),
+            is_multiline,
         }
     }
 }
@@ -2328,10 +2385,19 @@ impl<'a> DocBuild<'a> for EnumBody {
                 return result.push(b.concat(vec![b.txt("{"), b.nl(), b.txt("}")]));
             }
 
-            let sep = Insertable::new::<&str>(None, None, Some(b.nl()));
-            let open = Insertable::new(None, Some("{"), Some(b.nl()));
-            let close = Insertable::new(Some(b.nl()), Some("}"), None);
-            let doc = b.group_surround(&docs, sep, open, close);
+            let doc = if b.preserve_newlines() && !self.is_multiline {
+                // Source was single-line: allow group to keep it on one line
+                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                let open = Insertable::new(None, Some("{"), Some(b.maybeline()));
+                let close = Insertable::new(Some(b.maybeline()), Some("}"), None);
+                b.group_surround(&docs, sep, open, close)
+            } else {
+                // preserve_newlines=false (always expand) or source was multiline (keep multiline)
+                let sep = Insertable::new::<&str>(None, None, Some(b.nl()));
+                let open = Insertable::new(None, Some("{"), Some(b.nl()));
+                let close = Insertable::new(Some(b.nl()), Some("}"), None);
+                b.group_surround(&docs, sep, open, close)
+            };
             result.push(doc);
             handle_post_comments(b, bucket, result);
         } else {
@@ -3285,7 +3351,7 @@ impl<'a> DocBuild<'a> for CastExpression {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             result.push(b.txt("("));
             result.push(self.type_.build(b));
-            result.push(b.txt_(")"));
+            result.push(b.txt(")"));
             result.push(self.value.build(b));
         });
     }
@@ -4943,6 +5009,7 @@ impl<'a> DocBuild<'a> for MapCreationExpression {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             result.push(b.txt_("new"));
             result.push(self.type_.build(b));
+            result.push(b.txt(" "));
             result.push(self.value.build(b));
         });
     }
@@ -4952,6 +5019,8 @@ impl<'a> DocBuild<'a> for MapCreationExpression {
 pub struct MapInitializer {
     initializers: Vec<MapKeyInitializer>,
     pub node_context: NodeContext,
+    is_multiline: bool,
+    is_inside_parens: bool,
 }
 
 impl MapInitializer {
@@ -4964,9 +5033,19 @@ impl MapInitializer {
             .map(|n| MapKeyInitializer::new(n))
             .collect();
 
+        let is_multiline = node.start_position().row != node.end_position().row;
+        // map_initializer -> map_creation_expression -> parenthesized_expression?
+        let is_inside_parens = node
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|gp| gp.kind() == "parenthesized_expression")
+            .unwrap_or(false);
+
         Self {
             initializers,
             node_context: NodeContext::with_punctuation(&node),
+            is_multiline,
+            is_inside_parens,
         }
     }
 }
@@ -4976,11 +5055,27 @@ impl<'a> DocBuild<'a> for MapInitializer {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.initializers);
 
-            let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
-            let open = Insertable::new(None, Some("{"), Some(b.softline()));
-            let close = Insertable::new(Some(b.softline()), Some("}"), None);
-            let doc = b.group_surround(&docs, sep, open, close);
-            result.push(doc);
+            // When inside parens and preserve_newlines is on, use double indent so
+            // entries land at statement+8 (one level from `(`, one from `{`) while
+            // `}` stays at statement level.
+            if self.is_inside_parens && b.preserve_newlines() && self.is_multiline {
+                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                let entries = b.intersperse(&docs, sep);
+                let inner = b.concat(vec![
+                    b.txt("{"),
+                    b.indent(b.indent(b.softline())), // newline at L+8
+                    b.indent(b.indent(entries)),       // entries at L+8
+                    b.softline(),                      // newline at L (no indent)
+                    b.txt("}"),
+                ]);
+                result.push(b.group(b.concat(vec![b.force_break(), inner])));
+            } else {
+                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                let open = Insertable::new(None, Some("{"), Some(b.softline()));
+                let close = Insertable::new(Some(b.softline()), Some("}"), None);
+                let doc = b.group_surround_preserve(&docs, sep, open, close, self.is_multiline);
+                result.push(doc);
+            }
         });
     }
 }

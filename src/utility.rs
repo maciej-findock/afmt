@@ -563,10 +563,25 @@ pub fn build_chaining_context(node: &Node) -> Option<ChainingContext> {
     }
 
     let is_top_most_in_a_chain = has_a_chaining_child && !is_parent_a_chaining_node;
+    // True when the `.method()` navigation is on a different row than the object
+    // expression ends — i.e. the developer put the chain link on its own line.
+    // We can't use node start/end rows because a multiline inner expression (e.g.
+    // a map literal) always makes the whole method_invocation span multiple rows.
+    // method_invocation uses "name" child; field_access uses "field" child
+    let is_multiline = node
+        .try_c_by_n("object")
+        .and_then(|obj| {
+            node.try_c_by_n("name")
+                .or_else(|| node.try_c_by_n("field"))
+                .map(|nav| (obj, nav))
+        })
+        .map(|(obj, nav)| obj.end_position().row != nav.start_position().row)
+        .unwrap_or(false);
 
     Some(ChainingContext {
         is_top_most_in_a_chain,
         is_parent_a_chaining_node,
+        is_multiline,
     })
 }
 

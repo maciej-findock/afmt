@@ -208,12 +208,13 @@ impl<'a> DocBuild<'a> for Comment {
                         }
                     }
                 } else {
-                    // Regular block comment (non-JavaDoc)
+                    // Regular block comment: preserve content verbatim.
+                    // Use nl_with_no_indent so we don't re-indent internal lines.
                     for (i, line) in lines.iter().enumerate() {
-                        result.push(b.txt(line.trim()));
+                        result.push(b.txt(*line));
 
                         if i < lines.len() - 1 {
-                            result.push(b.nl());
+                            result.push(b.nl_with_no_indent());
                         }
                     }
                 }

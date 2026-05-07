@@ -29,14 +29,18 @@ struct PrettyPrinter<'a> {
 
 pub struct PrettyConfig {
     pub indent_size: u32,
+    pub preserve_newlines: bool,
 }
 
 impl PrettyConfig {
-    pub fn new(indent_size: u32) -> Self {
+    pub fn new(indent_size: u32, preserve_newlines: bool) -> Self {
         if indent_size == 0 {
             panic!("indent_size must be greater than 0")
         } else {
-            Self { indent_size }
+            Self {
+                indent_size,
+                preserve_newlines,
+            }
         }
     }
 }

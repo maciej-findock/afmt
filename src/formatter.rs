@@ -23,6 +23,9 @@ pub struct Config {
 
     #[serde(default = "default_indent_size")]
     pub indent_size: u32,
+
+    #[serde(default)]
+    pub preserve_newlines: bool,
 }
 
 fn default_max_width() -> u32 {
@@ -38,6 +41,7 @@ impl Default for Config {
         Self {
             max_width: default_max_width(),
             indent_size: default_indent_size(),
+            preserve_newlines: false,
         }
     }
 }
@@ -47,6 +51,7 @@ impl Config {
         Self {
             max_width,
             indent_size: 2,
+            preserve_newlines: false,
         }
     }
 
@@ -59,7 +64,11 @@ impl Config {
     }
 
     pub fn max_width(&self) -> u32 {
-        self.max_width
+        if self.max_width == 0 {
+            u32::MAX
+        } else {
+            self.max_width
+        }
     }
 
     pub fn indent_size(&self) -> u32 {
@@ -151,11 +160,11 @@ impl Formatter {
         let root: Root = enrich(&ast_tree);
 
         // traverse enriched data and create pretty print combinators
-        let c = PrettyConfig::new(config.indent_size);
+        let c = PrettyConfig::new(config.indent_size, config.preserve_newlines);
         let b = DocBuilder::new(c);
         let doc_ref = root.build(&b);
 
-        let result = pretty_print(doc_ref, config.max_width);
+        let result = pretty_print(doc_ref, config.max_width());
 
         // debugging tool: use this to print named node value + comments in bucket
         // print_comment_map(&ast_tree);

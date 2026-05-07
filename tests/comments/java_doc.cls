@@ -1,8 +1,8 @@
 /*
-* This is a
-* multiline block comment
-* that is not JavaDoc.
-*/
+ * This is a
+ * multiline block comment
+ * that is not JavaDoc.
+ */
 
 /**
  * This is a JavaDoc

@@ -1,7 +1,13 @@
 # .afmt.toml - Configuration for afmt
 
 # Maximum line width
-max_width = 80
+max_width = 0
 
 # Indentation size in spaces
 indent_size = 4
+
+# Preserve developer-chosen vertical layout.
+# When true, any argument list, parameter list, array initializer, or map
+# initializer that was written multiline in the source stays multiline in the
+# output. Only horizontal formatting (spacing, indentation) is corrected.
+preserve_newlines = true

@@ -29,6 +29,25 @@ impl<'a> DocBuilder<'a> {
         self.group(self.surround(elems, sep, open, close))
     }
 
+    // Like group_surround but forces multiline when force_break is true and
+    // preserve_newlines is enabled. The ForceBreak inside the group causes
+    // fits() to return false, guaranteeing the multiline path is always taken.
+    pub fn group_surround_preserve(
+        &'a self,
+        elems: &[DocRef<'a>],
+        sep: Insertable<'a>,
+        open: Insertable<'a>,
+        close: Insertable<'a>,
+        force_break: bool,
+    ) -> DocRef<'a> {
+        let inner = self.surround(elems, sep, open, close);
+        if force_break && self.config.preserve_newlines {
+            self.group(self.concat(vec![self.force_break(), inner]))
+        } else {
+            self.group(inner)
+        }
+    }
+
     pub fn surround(
         &'a self,
         elems: &[DocRef<'a>],
@@ -157,6 +176,10 @@ impl<'a> DocBuilder<'a> {
         self.group(self.indent(doc_ref))
     }
 
+    pub fn preserve_newlines(&self) -> bool {
+        self.config.preserve_newlines
+    }
+
     pub fn group_concat(&'a self, doc_refs: impl IntoIterator<Item = DocRef<'a>>) -> DocRef<'a> {
         self.group(self.concat(doc_refs))
     }
@@ -185,7 +208,7 @@ impl<'a> DocBuilder<'a> {
         self.concat(vec![self.nl_with_no_indent(), self.nl()])
     }
 
-    fn nl_with_no_indent(&'a self) -> DocRef<'a> {
+    pub fn nl_with_no_indent(&'a self) -> DocRef<'a> {
         self.arena.alloc(Doc::NewlineWithNoIndent)
     }
 
