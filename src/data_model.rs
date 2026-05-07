@@ -915,14 +915,18 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                 if let Some(context) = context {
                     // When preserve_newlines is on and this chain link is single-line in source
                     // (i.e. the `.method()` is on the same row as the object ends), skip the
-                    // maybeline break point. Applies to both intermediate and top-most links so
+                    // break point. Applies to both intermediate and top-most links so
                     // that e.g. `Type.forName(...).newInstance()` doesn't split at `Type`.
                     let preserve_flat_chain = b.preserve_newlines() && !context.is_multiline;
 
                     if !preserve_flat_chain
                         && (context.is_parent_a_chaining_node || context.is_top_most_in_a_chain)
                     {
-                        docs.push(b.maybeline());
+                        if b.preserve_newlines() && context.is_multiline {
+                            docs.push(b.nl());
+                        } else {
+                            docs.push(b.maybeline());
+                        }
                     }
 
                     docs.push(property_navigation.build(b));
