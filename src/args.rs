@@ -19,7 +19,7 @@ pub fn get_args() -> Args {
         .arg(
             ClapArg::new("file")
                 .value_name("FILE")
-                .help("The relative path to the file to parse")
+                .help("The relative path to the file to parse, or '-' to read from stdin")
                 .required(true)
                 .index(1),
         )
@@ -69,6 +69,9 @@ pub fn get_args() -> Args {
              \n\
              # Verify if the file is already formatted\n\
              afmt --check ./file.cls\n\
+             \n\
+             # Read from stdin and write formatted output to stdout (e.g. VSCode formatter)\n\
+             afmt --config .afmt.toml -\n\
             ",
         )
         .get_matches();
