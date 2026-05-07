@@ -529,7 +529,7 @@ pub struct ArrayInitializer {
     initializers: Vec<VariableInitializer>,
     pub node_context: NodeContext,
     is_multiline: bool,
-    items_are_multiline: bool,
+    item_row_breaks: Vec<bool>, // item_row_breaks[i] = true → break between item i and i+1
     is_inside_argument_list: bool,
 }
 
@@ -548,10 +548,11 @@ impl ArrayInitializer {
             .first()
             .map(|n| n.start_position().row != node.start_position().row)
             .unwrap_or(false);
-        // true only when items themselves are on separate rows from each other
-        let items_are_multiline = children.windows(2).any(|w| {
-            w[0].end_position().row < w[1].start_position().row
-        });
+        // row break between each consecutive pair of items
+        let item_row_breaks: Vec<bool> = children
+            .windows(2)
+            .map(|w| w[0].end_position().row < w[1].start_position().row)
+            .collect();
         let grandparent_kind = node
             .parent()
             .and_then(|p| p.parent())
@@ -566,7 +567,7 @@ impl ArrayInitializer {
             initializers,
             node_context: NodeContext::with_punctuation(&node),
             is_multiline,
-            items_are_multiline,
+            item_row_breaks,
             is_inside_argument_list,
         }
     }
@@ -576,14 +577,14 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.initializers);
+            let has_row_breaks = self.item_row_breaks.iter().any(|&br| br);
 
-            if b.preserve_newlines() && self.is_multiline && !self.items_are_multiline {
-                // Items are all on one row in source — keep them inline, but preserve
-                // the multiline { ... } block structure with hardlines.
+            if b.preserve_newlines() && self.is_multiline && !has_row_breaks {
+                // First item on new line after {, all items on one source row —
+                // keep items inline but preserve the { ... } block structure.
                 let sep = Insertable::new::<&str>(None, None, Some(b.txt(" ")));
                 let entries = b.intersperse(&docs, sep);
                 if self.is_inside_argument_list {
-                    // Argument list surround already provides +4; don't double-indent.
                     result.push(b.concat(vec![
                         b.txt("{"),
                         b.nl(),
@@ -600,11 +601,30 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                         b.txt("}"),
                     ]));
                 }
+            } else if b.preserve_newlines() && !self.is_multiline && has_row_breaks {
+                // First item on same line as { but items overflow to next rows —
+                // preserve the source row grouping: items sharing a row stay together.
+                // commas are already in each item's NodeContext; we only add spacing
+                let mut parts = vec![b.txt("{"), b.txt(" ")];
+                for (i, doc) in docs.iter().enumerate() {
+                    parts.push(doc);
+                    if i < docs.len() - 1 {
+                        if self.item_row_breaks[i] {
+                            parts.push(b.indent(b.indent(b.nl())));
+                        } else {
+                            parts.push(b.txt(" "));
+                        }
+                    }
+                }
+                parts.push(b.txt(" "));
+                parts.push(b.txt("}"));
+                result.push(b.concat(parts));
             } else {
                 let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
                 let open = Insertable::new(None, Some("{"), Some(b.softline()));
                 let close = Insertable::new(Some(b.softline()), Some("}"), None);
-                let doc = b.group_surround_preserve(&docs, sep, open, close, self.is_multiline);
+                let force = self.is_multiline && has_row_breaks;
+                let doc = b.group_surround_preserve(&docs, sep, open, close, force);
                 result.push(doc);
             }
         });
