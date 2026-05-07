@@ -529,24 +529,41 @@ pub struct ArrayInitializer {
     initializers: Vec<VariableInitializer>,
     pub node_context: NodeContext,
     is_multiline: bool,
+    items_are_multiline: bool,
+    is_inside_argument_list: bool,
 }
 
 impl ArrayInitializer {
     pub fn new(node: Node) -> Self {
         assert_check(node, "array_initializer");
 
-        let initializers: Vec<_> = node
-            .children_vec()
-            .into_iter()
-            .map(|n| VariableInitializer::new(n))
+        let children = node.children_vec();
+        let initializers: Vec<_> = children
+            .iter()
+            .map(|n| VariableInitializer::new(*n))
             .collect();
 
         let is_multiline = node.start_position().row != node.end_position().row;
+        // true only when items themselves are on separate rows from each other
+        let items_are_multiline = children.windows(2).any(|w| {
+            w[0].end_position().row < w[1].start_position().row
+        });
+        let grandparent_kind = node
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|gp| gp.kind());
+        // array_initializer -> array_creation_expression -> argument_list?
+        let is_inside_argument_list = grandparent_kind
+            .as_deref()
+            .map(|k| k == "argument_list")
+            .unwrap_or(false);
 
         Self {
             initializers,
             node_context: NodeContext::with_punctuation(&node),
             is_multiline,
+            items_are_multiline,
+            is_inside_argument_list,
         }
     }
 }
@@ -556,11 +573,36 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.initializers);
 
-            let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
-            let open = Insertable::new(None, Some("{"), Some(b.softline()));
-            let close = Insertable::new(Some(b.softline()), Some("}"), None);
-            let doc = b.group_surround_preserve(&docs, sep, open, close, self.is_multiline);
-            result.push(doc);
+            if b.preserve_newlines() && self.is_multiline && !self.items_are_multiline {
+                // Items are all on one row in source — keep them inline, but preserve
+                // the multiline { ... } block structure with hardlines.
+                let sep = Insertable::new::<&str>(None, None, Some(b.txt(" ")));
+                let entries = b.intersperse(&docs, sep);
+                if self.is_inside_argument_list {
+                    // Argument list surround already provides +4; don't double-indent.
+                    result.push(b.concat(vec![
+                        b.txt("{"),
+                        b.nl(),
+                        entries,
+                        b.dedent(b.nl()),
+                        b.txt("}"),
+                    ]));
+                } else {
+                    result.push(b.concat(vec![
+                        b.txt("{"),
+                        b.indent(b.nl()),
+                        b.indent(entries),
+                        b.nl(),
+                        b.txt("}"),
+                    ]));
+                }
+            } else {
+                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                let open = Insertable::new(None, Some("{"), Some(b.softline()));
+                let close = Insertable::new(Some(b.softline()), Some("}"), None);
+                let doc = b.group_surround_preserve(&docs, sep, open, close, self.is_multiline);
+                result.push(doc);
+            }
         });
     }
 }
@@ -1031,7 +1073,15 @@ impl<'a> DocBuild<'a> for ArgumentList {
             let docs = b.to_docs(&self.expressions);
 
             let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
-            let open = Insertable::new(None, Some("("), Some(b.maybeline()));
+            // When preserve_newlines is on and the first arg was on the same row as `(`
+            // (detected by !is_multiline) but the arg content spans rows (close_paren_hugging),
+            // don't add a line-break before the first arg.
+            let open_suf = if b.preserve_newlines() && !self.is_multiline && self.close_paren_hugging {
+                None
+            } else {
+                Some(b.maybeline())
+            };
+            let open = Insertable::new(None, Some("("), open_suf);
             let close_pre = if b.preserve_newlines() && self.close_paren_hugging {
                 None
             } else {
@@ -3369,16 +3419,25 @@ pub struct CastExpression {
     pub type_: Type,
     pub value: Expression,
     pub node_context: NodeContext,
+    has_space_after_paren: bool,
 }
 
 impl CastExpression {
     pub fn new(node: Node) -> Self {
         assert_check(node, "cast_expression");
 
+        let type_node = node.c_by_n("type");
+        let value_node = node.c_by_n("value");
+        // `)` sits immediately after the type node; a space exists when value starts
+        // two or more columns later (on the same row) or on a different row.
+        let has_space_after_paren = type_node.end_position().row != value_node.start_position().row
+            || value_node.start_position().column > type_node.end_position().column + 1;
+
         Self {
-            type_: Type::new(node.c_by_n("type")),
-            value: Expression::new(node.c_by_n("value")),
+            type_: Type::new(type_node),
+            value: Expression::new(value_node),
             node_context: NodeContext::with_punctuation(&node),
+            has_space_after_paren,
         }
     }
 }
@@ -3388,7 +3447,11 @@ impl<'a> DocBuild<'a> for CastExpression {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             result.push(b.txt("("));
             result.push(self.type_.build(b));
-            result.push(b.txt(")"));
+            if b.preserve_newlines() && self.has_space_after_paren {
+                result.push(b.txt(") "));
+            } else {
+                result.push(b.txt(")"));
+            }
             result.push(self.value.build(b));
         });
     }
