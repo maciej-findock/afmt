@@ -144,21 +144,57 @@ Afmt completed successfully.
 ```
 <br>
 
-## 🔧 Configuration:
+## 🔧 Configuration
 
-`-c` parameter can read configuration settings from a toml file.
+`afmt` reads configuration from a `.afmt.toml` file passed with the `-c` flag:
 
-Example: `afmt -c .afmt.toml`
+```bash
+afmt -c .afmt.toml ./file.cls
+```
 
-In `.afmt.toml` config file, two options are supported
+### All options
 
 ```toml
-# Maximum line width
+# Maximum line width before wrapping (0 = use default of 80)
 max_width = 80
 
 # Indentation size in spaces
 indent_size = 4
+
+# Preserve developer-chosen vertical layout.
+# When true, any argument list, parameter list, array initializer, or map
+# initializer that was written multiline in the source stays multiline in the
+# output. Only horizontal formatting (spacing, indentation) is corrected.
+preserve_newlines = false
 ```
+
+### `preserve_newlines`
+
+By default `afmt` (like Prettier) may collapse or reflow multiline constructs
+to fit within `max_width`. With `preserve_newlines = true` the formatter
+respects the line breaks the developer already placed:
+
+```apex
+// source — argument list split across lines
+result = someMethod(
+    argumentOne,
+    argumentTwo,
+    argumentThree
+);
+
+// preserve_newlines = false → may collapse to one line if it fits
+result = someMethod(argumentOne, argumentTwo, argumentThree);
+
+// preserve_newlines = true → multiline layout is kept
+result = someMethod(
+    argumentOne,
+    argumentTwo,
+    argumentThree
+);
+```
+
+Affected constructs: argument lists, parameter lists, array initializers, and
+map initializers.
 
 <br>
 
@@ -166,7 +202,7 @@ indent_size = 4
 
 - "TLTR, what features afmt has?" Run `afmt -h`.
 - "How do I set up afmt in VSCode?"
-[Setup in VSCode](./md/VSCode_Setup.md)
+  [Setup in VSCode](./md/VSCode_Setup.md)
 
 - "Can afmt formats exactly the same as Prettier Apex?"
 No.

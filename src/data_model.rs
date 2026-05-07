@@ -1212,6 +1212,9 @@ pub struct BinaryExpressionContext {
     has_parent_same_precedence: bool,
     is_parent_return_statement: bool,
     is_multiline: bool,
+    break_before_op: bool,   // developer put a newline before the operator
+    break_after_op: bool,    // developer put a newline after the operator
+    chain_is_multiline: bool, // any node in the chain (including descendants) spans rows
 }
 
 #[derive(Debug)]
@@ -1229,11 +1232,15 @@ impl BinaryExpression {
         let op = op_node.kind();
         let precedence = get_precedence(op);
         let left = node.c_by_n("left");
+        let right = node.c_by_n("right");
         let parent = node
             .parent()
             .expect("BinaryExpression node should always have a parent");
 
-        let is_multiline = left.end_position().row != op_node.start_position().row;
+        let break_before_op = left.end_position().row != op_node.start_position().row;
+        let break_after_op = op_node.end_position().row != right.start_position().row;
+        let is_multiline = break_before_op || break_after_op;
+        let chain_is_multiline = node.start_position().row != node.end_position().row;
         let is_a_chaining_inner_node = is_binary_exp(&parent);
         let has_parent_same_precedence = is_binary_exp(&parent)
             && precedence == get_precedence(parent.c_by_n("operator").kind());
@@ -1243,6 +1250,9 @@ impl BinaryExpression {
             is_a_chaining_inner_node,
             is_parent_return_statement: parent.kind() == "return_statement",
             is_multiline,
+            break_before_op,
+            break_after_op,
+            chain_is_multiline,
         }
     }
 
@@ -1267,33 +1277,39 @@ impl<'a> DocBuild<'a> for BinaryExpression {
             let right_doc = self.right.build(b);
 
             let context = &self.context;
-            let line = if b.preserve_newlines() && context.is_multiline {
-                b.nl()
+
+            // With preserve_newlines, honour where the developer placed the line break:
+            // before the operator (`\n&&`) or after it (`&&\n`).
+            let (pre_op, post_op) = if b.preserve_newlines() && context.is_multiline {
+                let pre = if context.break_before_op { b.nl() } else { b.txt(" ") };
+                let post = if context.break_after_op { b.nl() } else { b.txt(" ") };
+                (pre, post)
             } else {
-                b.softline()
+                (b.softline(), b.txt(" "))
             };
 
             // chaining case: delegate to the parent to handle group() or align()
             if context.has_parent_same_precedence {
-                return result.push(b.concat(vec![left_doc, line, op_doc, b.txt(" "), right_doc]));
+                return result
+                    .push(b.concat(vec![left_doc, pre_op, op_doc, post_op, right_doc]));
             }
+
+            let inner = b.concat(vec![left_doc, pre_op, op_doc, post_op, right_doc]);
 
             // group() using the current line indent level
             if !context.is_a_chaining_inner_node && !context.is_parent_return_statement {
-                let inner = b.concat(vec![left_doc, line, op_doc, b.txt(" "), right_doc]);
-                return result.push(if b.preserve_newlines() && context.is_multiline {
+                return result.push(if b.preserve_newlines() && context.chain_is_multiline {
                     b.group(b.indent(b.indent(inner)))
                 } else {
-                    b.group_concat(vec![left_doc, line, op_doc, b.txt(" "), right_doc])
+                    b.group(inner)
                 });
             }
 
             // otherwise:
-            let inner = b.concat(vec![left_doc, line, op_doc, b.txt(" "), right_doc]);
-            result.push(if b.preserve_newlines() && context.is_multiline {
+            result.push(if b.preserve_newlines() && context.chain_is_multiline {
                 b.group(b.indent(b.indent(inner)))
             } else {
-                b.group_indent_concat(vec![left_doc, line, op_doc, b.txt(" "), right_doc])
+                b.group_indent(inner)
             })
         });
     }
