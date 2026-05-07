@@ -410,6 +410,9 @@ pub fn handle_pre_comments<'a>(
 
     let mut docs = Vec::new();
     for (i, comment) in bucket.pre_comments.iter().enumerate() {
+        if comment.is_printed() {
+            continue;
+        }
         if comment.has_leading_content() {
             docs.push(b.txt(" "));
         } else {

@@ -2,6 +2,7 @@ use crate::{
     data_model::DocBuild,
     doc::{Doc, DocRef, PrettyConfig},
     enum_def::BodyMember,
+    utility::get_comment_bucket,
 };
 use typed_arena::Arena;
 
@@ -125,6 +126,21 @@ impl<'a> DocBuilder<'a> {
             return self.concat(vec![self.txt(open), self.nl(), self.txt(close)]);
         }
 
+        // When preserve_newlines is on, a line comment on the same row as `{`
+        // (stored as a pre-comment of the first body member with is_on_parent_open_line)
+        // should stay on the `{` line rather than moving to the next line.
+        let open_line_comment = if self.preserve_newlines() {
+            elems.first().and_then(|first| {
+                let bucket = get_comment_bucket(&first.node_id);
+                bucket.pre_comments.first().filter(|c| c.is_on_parent_open_line()).map(|c| {
+                    c.mark_as_printed(); // prevent handle_pre_comments from re-rendering it
+                    self.concat(vec![self.txt(" "), self.txt(&c.value)])
+                })
+            })
+        } else {
+            None
+        };
+
         let leading = if self.preserve_newlines()
             && elems.first().is_some_and(|m| m.has_leading_newline)
         {
@@ -133,14 +149,15 @@ impl<'a> DocBuilder<'a> {
             self.indent(self.nl())
         };
 
-        let multi_line = self.concat(vec![
-            self.txt(open),
-            leading,
-            self.indent(self.intersperse_body_members(elems)),
-            self.nl(),
-            self.txt(close),
-        ]);
-        multi_line
+        let mut parts = vec![self.txt(open)];
+        if let Some(c) = open_line_comment {
+            parts.push(c);
+        }
+        parts.push(leading);
+        parts.push(self.indent(self.intersperse_body_members(elems)));
+        parts.push(self.nl());
+        parts.push(self.txt(close));
+        self.concat(parts)
     }
 
     pub fn intersperse_body_members<'b, M>(&'a self, members: &[BodyMember<M>]) -> DocRef<'a>

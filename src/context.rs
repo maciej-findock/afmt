@@ -130,6 +130,10 @@ impl Comment {
         self.metadata.dedent_levels
     }
 
+    pub fn is_on_parent_open_line(&self) -> bool {
+        self.metadata.is_on_parent_open_line
+    }
+
     pub fn mark_as_printed(&self) {
         self.is_printed.set(true);
     }
@@ -238,6 +242,9 @@ pub struct CommentMetadata {
     // How many 4-space indent levels the comment sits to the left of its previous sibling.
     // Used by preserve_newlines to render post-comments at the original column.
     pub dedent_levels: u32,
+    // True when the comment shares a row with its parent node's opening token (e.g. `{`).
+    // Used by preserve_newlines to keep `{ //comment` on one line.
+    pub is_on_parent_open_line: bool,
 }
 
 impl CommentMetadata {
@@ -294,6 +301,11 @@ impl CommentMetadata {
             0
         };
 
+        // True when the comment is on the same row as its parent's opening token.
+        let is_on_parent_open_line = node
+            .parent()
+            .is_some_and(|p| p.start_position().row == node.start_position().row);
+
         CommentMetadata {
             has_leading_content,
             has_trailing_content,
@@ -302,6 +314,7 @@ impl CommentMetadata {
             has_prev_node,
             is_followed_by_bracket_composite_node,
             dedent_levels,
+            is_on_parent_open_line,
         }
     }
 }
