@@ -1035,7 +1035,9 @@ pub struct ArgumentList {
     pub expressions: Vec<Expression>,
     pub node_context: NodeContext,
     is_multiline: bool,
+    args_are_multiline: bool,
     close_paren_hugging: bool,
+    same_line_nesting_depth: u32,
 }
 
 impl ArgumentList {
@@ -1046,23 +1048,44 @@ impl ArgumentList {
             .map(|n| Expression::new(*n))
             .collect();
 
-        // is_multiline: true only when args are laid out on separate rows from each other.
-        // An arg whose internal content spans rows (e.g. a map literal) does not count.
-        let is_multiline = children.windows(2).any(|w| {
+        // is_multiline: true when first arg is below `(`, OR any two consecutive args are on
+        // separate rows. An arg whose internal content spans rows does not count by itself.
+        let args_are_multiline = children.windows(2).any(|w| {
             w[0].end_position().row < w[1].start_position().row
-        }) || children
-            .first()
-            .is_some_and(|first| first.start_position().row > node.start_position().row);
+        });
+        let is_multiline = args_are_multiline
+            || children
+                .first()
+                .is_some_and(|first| first.start_position().row > node.start_position().row);
         let close_paren_hugging = node.start_position().row != node.end_position().row
             && children
                 .last()
                 .is_some_and(|last| last.end_position().row == node.end_position().row);
+        // Count how many ancestor argument_lists share this `(` row.
+        // outer(inner(  ← both `(` on row N → depth 1 for inner, depth 2 for innermost
+        // Style guide: closing `)` matches statement base; args at base+8 regardless of depth.
+        let same_line_nesting_depth = {
+            let my_row = node.start_position().row;
+            let mut depth = 0u32;
+            let mut cur = node.parent().and_then(|p| p.parent());
+            while let Some(anc) = cur {
+                if anc.kind() == "argument_list" && anc.start_position().row == my_row {
+                    depth += 1;
+                    cur = anc.parent().and_then(|p| p.parent());
+                } else {
+                    break;
+                }
+            }
+            depth
+        };
 
         Self {
             expressions,
             node_context: NodeContext::with_punctuation(&node),
             is_multiline,
+            args_are_multiline,
             close_paren_hugging,
+            same_line_nesting_depth,
         }
     }
 }
@@ -1072,7 +1095,36 @@ impl<'a> DocBuild<'a> for ArgumentList {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.expressions);
 
-            let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+            // depth >= 2: outer nesting already contributes 8 spaces of continuation.
+            // Build doc without surround's extra indent so args stay at current_indent.
+            // Closing `)` dedents by depth levels to reach the statement base.
+            if b.preserve_newlines() && self.is_multiline && self.same_line_nesting_depth >= 2 {
+                let sep_suf = if self.args_are_multiline { b.softline() } else { b.txt(" ") };
+                let sep = Insertable::new::<&str>(None, None, Some(sep_suf));
+                let inner = b.intersperse(&docs, sep);
+                let mut close_nl = b.maybeline();
+                for _ in 0..self.same_line_nesting_depth {
+                    close_nl = b.dedent(close_nl);
+                }
+                let doc = b.group(b.concat(vec![
+                    b.force_break(),
+                    b.txt("("),
+                    b.maybeline(),
+                    inner,
+                    close_nl,
+                    b.txt(")"),
+                ]));
+                result.push(doc);
+                return;
+            }
+
+            // When args are on the same row in source, keep them inline with a space.
+            let sep_suf = if b.preserve_newlines() && self.is_multiline && !self.args_are_multiline {
+                b.txt(" ")
+            } else {
+                b.softline()
+            };
+            let sep = Insertable::new::<&str>(None, None, Some(sep_suf));
             // When preserve_newlines is on and the first arg was on the same row as `(`
             // (detected by !is_multiline) but the arg content spans rows (close_paren_hugging),
             // don't add a line-break before the first arg.
@@ -1082,8 +1134,12 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 Some(b.maybeline())
             };
             let open = Insertable::new(None, Some("("), open_suf);
+            // Style guide: closing `)` matches the indentation level of the wrapped expression.
+            // depth == 1: one dedent brings `)` to statement base.
             let close_pre = if b.preserve_newlines() && self.close_paren_hugging {
                 None
+            } else if b.preserve_newlines() && self.is_multiline && self.same_line_nesting_depth == 1 {
+                Some(b.dedent(b.maybeline()))
             } else {
                 Some(b.maybeline())
             };
@@ -5123,6 +5179,7 @@ pub struct MapInitializer {
     is_multiline: bool,
     is_inside_parens: bool,
     is_inside_argument_list: bool,
+    same_line_nesting_depth: u32,
 }
 
 impl MapInitializer {
@@ -5150,6 +5207,26 @@ impl MapInitializer {
             .as_deref()
             .map(|k| k == "argument_list")
             .unwrap_or(false);
+        // Count outer argument_lists beyond the direct container that share the same row.
+        // outer(inner(new Map{...})): direct arglist = inner's, outer arglist adds depth=1.
+        let same_line_nesting_depth = {
+            let map_row = node.start_position().row;
+            let mut depth = 0u32;
+            let mut cur = node
+                .parent()                    // map_creation_expression
+                .and_then(|p| p.parent())    // direct argument_list
+                .and_then(|p| p.parent())    // method_invocation
+                .and_then(|p| p.parent());   // possibly outer argument_list
+            while let Some(anc) = cur {
+                if anc.kind() == "argument_list" && anc.start_position().row == map_row {
+                    depth += 1;
+                    cur = anc.parent().and_then(|p| p.parent());
+                } else {
+                    break;
+                }
+            }
+            depth
+        };
 
         Self {
             initializers,
@@ -5157,6 +5234,7 @@ impl MapInitializer {
             is_multiline,
             is_inside_parens,
             is_inside_argument_list,
+            same_line_nesting_depth,
         }
     }
 }
@@ -5186,14 +5264,22 @@ impl<'a> DocBuild<'a> for MapInitializer {
                 let sep = Insertable::new::<&str>(None, None, Some(b.nl()));
                 let entries = b.intersperse(&docs, sep);
                 if self.is_inside_argument_list {
-                    // The argument list's surround already provides +4 indent.
-                    // Don't add another +4 — entries stay at arglist indent level,
-                    // and } dedents back to the arglist's outer (= assignment) level.
+                    // Each outer same-row argument_list contributes an extra +4 via
+                    // its surround/indent. Apply depth dedents to entries and depth+1
+                    // to `}` so they land at statement_base+4 and statement_base.
+                    let mut entries_nl = b.nl();
+                    for _ in 0..self.same_line_nesting_depth {
+                        entries_nl = b.dedent(entries_nl);
+                    }
+                    let mut close_nl = b.nl();
+                    for _ in 0..=self.same_line_nesting_depth {
+                        close_nl = b.dedent(close_nl);
+                    }
                     result.push(b.concat(vec![
                         b.txt("{"),
-                        b.nl(),
+                        entries_nl,
                         entries,
-                        b.dedent(b.nl()),
+                        close_nl,
                         b.txt("}"),
                     ]));
                 } else {
