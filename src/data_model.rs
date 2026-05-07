@@ -1244,6 +1244,7 @@ pub struct BinaryExpressionContext {
     break_after_op: bool,    // developer put a newline after the operator
     chain_is_multiline: bool, // any node in the chain (including descendants) spans rows
     is_top_level_condition: bool, // direct child of an if/while/for condition parens
+    is_inside_binary_paren: bool, // inside (...) that is directly inside another binary expression
 }
 
 #[derive(Debug)]
@@ -1284,6 +1285,8 @@ impl BinaryExpression {
                         | "enhanced_for_statement"
                 )
             });
+        let is_inside_binary_paren = parent.kind() == "parenthesized_expression"
+            && parent.parent().is_some_and(|gp| is_binary_exp(&gp));
 
         BinaryExpressionContext {
             has_parent_same_precedence,
@@ -1294,6 +1297,7 @@ impl BinaryExpression {
             break_after_op,
             chain_is_multiline,
             is_top_level_condition,
+            is_inside_binary_paren,
         }
     }
 
@@ -1339,13 +1343,19 @@ impl<'a> DocBuild<'a> for BinaryExpression {
 
             // group() using the current line indent level
             if !context.is_a_chaining_inner_node && !context.is_parent_return_statement {
-                return result.push(
-                    if b.preserve_newlines() && context.chain_is_multiline && context.is_top_level_condition {
+                return result.push(if b.preserve_newlines() && context.chain_is_multiline {
+                    if context.is_top_level_condition {
                         b.group(b.indent(b.indent(inner)))
+                    } else if context.is_inside_binary_paren && context.break_before_op {
+                        // break_before_op: developer aligned operator as continuation (e.g. \n||)
+                        // inside a paren → add single indent so it sits visually inside the paren
+                        b.group(b.indent(inner))
                     } else {
                         b.group(inner)
-                    },
-                );
+                    }
+                } else {
+                    b.group(inner)
+                });
             }
 
             // otherwise (is_a_chaining_inner_node with different-precedence parent,
