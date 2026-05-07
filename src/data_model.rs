@@ -543,7 +543,11 @@ impl ArrayInitializer {
             .map(|n| VariableInitializer::new(*n))
             .collect();
 
-        let is_multiline = node.start_position().row != node.end_position().row;
+        // true only when developer deliberately put the first item on a new line after {
+        let is_multiline = children
+            .first()
+            .map(|n| n.start_position().row != node.start_position().row)
+            .unwrap_or(false);
         // true only when items themselves are on separate rows from each other
         let items_are_multiline = children.windows(2).any(|w| {
             w[0].end_position().row < w[1].start_position().row
@@ -5238,7 +5242,12 @@ impl MapInitializer {
             .map(|n| MapKeyInitializer::new(n))
             .collect();
 
-        let is_multiline = node.start_position().row != node.end_position().row;
+        // true only when developer deliberately put the first entry on a new line after {
+        let is_multiline = node
+            .children_vec()
+            .first()
+            .map(|n| n.start_position().row != node.start_position().row)
+            .unwrap_or(false);
         let grandparent_kind = node
             .parent()
             .and_then(|p| p.parent())
