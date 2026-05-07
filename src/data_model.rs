@@ -1215,6 +1215,7 @@ pub struct BinaryExpressionContext {
     break_before_op: bool,   // developer put a newline before the operator
     break_after_op: bool,    // developer put a newline after the operator
     chain_is_multiline: bool, // any node in the chain (including descendants) spans rows
+    is_top_level_condition: bool, // direct child of an if/while/for condition parens
 }
 
 #[derive(Debug)]
@@ -1244,6 +1245,17 @@ impl BinaryExpression {
         let is_a_chaining_inner_node = is_binary_exp(&parent);
         let has_parent_same_precedence = is_binary_exp(&parent)
             && precedence == get_precedence(parent.c_by_n("operator").kind());
+        let is_top_level_condition = parent.kind() == "parenthesized_expression"
+            && parent.parent().is_some_and(|gp| {
+                matches!(
+                    gp.kind(),
+                    "if_statement"
+                        | "while_statement"
+                        | "do_statement"
+                        | "for_statement"
+                        | "enhanced_for_statement"
+                )
+            });
 
         BinaryExpressionContext {
             has_parent_same_precedence,
@@ -1253,6 +1265,7 @@ impl BinaryExpression {
             break_before_op,
             break_after_op,
             chain_is_multiline,
+            is_top_level_condition,
         }
     }
 
@@ -1298,16 +1311,23 @@ impl<'a> DocBuild<'a> for BinaryExpression {
 
             // group() using the current line indent level
             if !context.is_a_chaining_inner_node && !context.is_parent_return_statement {
-                return result.push(if b.preserve_newlines() && context.chain_is_multiline {
+                return result.push(
+                    if b.preserve_newlines() && context.chain_is_multiline && context.is_top_level_condition {
+                        b.group(b.indent(b.indent(inner)))
+                    } else {
+                        b.group(inner)
+                    },
+                );
+            }
+
+            // otherwise (is_a_chaining_inner_node with different-precedence parent,
+            // or is_parent_return_statement):
+            result.push(if b.preserve_newlines() && context.chain_is_multiline {
+                if context.is_parent_return_statement {
                     b.group(b.indent(b.indent(inner)))
                 } else {
                     b.group(inner)
-                });
-            }
-
-            // otherwise:
-            result.push(if b.preserve_newlines() && context.chain_is_multiline {
-                b.group(b.indent(b.indent(inner)))
+                }
             } else {
                 b.group_indent(inner)
             })
