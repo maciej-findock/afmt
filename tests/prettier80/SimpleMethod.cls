@@ -45,7 +45,7 @@ public class SimpleMethod {
   }
 
   void longMethodCall() {
-    ((SObject)a)
+    ((SObject) a)
       .get('Very_Long_Field_Name__c')
       .subString(0, 5)
       .escapeHtml4()

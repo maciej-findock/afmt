@@ -3684,7 +3684,7 @@ impl<'a> DocBuild<'a> for CastExpression {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             result.push(b.txt("("));
             result.push(self.type_.build(b));
-            if b.preserve_newlines() && self.has_space_after_paren {
+            if !b.preserve_newlines() || self.has_space_after_paren {
                 result.push(b.txt(") "));
             } else {
                 result.push(b.txt(")"));

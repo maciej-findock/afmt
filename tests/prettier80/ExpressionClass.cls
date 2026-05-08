@@ -53,8 +53,8 @@ class Conditional extends Object {
   void castExpression() {
     String a;
 
-    Id b = (Id)a;
-    Schema.SObjectType sobjectType = ((Id)a).getSObjectType();
+    Id b = (Id) a;
+    Schema.SObjectType sobjectType = ((Id) a).getSObjectType();
   }
 
   void instanceOfExpression() {

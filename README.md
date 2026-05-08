@@ -155,7 +155,7 @@ afmt -c .afmt.toml ./file.cls
 ### All options
 
 ```toml
-# Maximum line width before wrapping (0 = use default of 80)
+# Maximum line width before wrapping (0 = unlimited)
 max_width = 80
 
 # Indentation size in spaces
