@@ -605,7 +605,7 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                 // First item on same line as { but items overflow to next rows —
                 // preserve the source row grouping: items sharing a row stay together.
                 // commas are already in each item's NodeContext; we only add spacing
-                let mut parts = vec![b.txt("{"), b.txt(" ")];
+                let mut parts = vec![b.txt("{")];
                 for (i, doc) in docs.iter().enumerate() {
                     parts.push(doc);
                     if i < docs.len() - 1 {
@@ -616,13 +616,12 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                         }
                     }
                 }
-                parts.push(b.txt(" "));
                 parts.push(b.txt("}"));
                 result.push(b.concat(parts));
             } else {
                 let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
-                let open = Insertable::new(None, Some("{"), Some(b.softline()));
-                let close = Insertable::new(Some(b.softline()), Some("}"), None);
+                let open = Insertable::new(None, Some("{"), Some(b.maybeline()));
+                let close = Insertable::new(Some(b.maybeline()), Some("}"), None);
                 let force = self.is_multiline && has_row_breaks;
                 let doc = b.group_surround_preserve(&docs, sep, open, close, force);
                 result.push(doc);
@@ -5416,8 +5415,8 @@ impl<'a> DocBuild<'a> for MapInitializer {
                 }
             } else {
                 let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
-                let open = Insertable::new(None, Some("{"), Some(b.softline()));
-                let close = Insertable::new(Some(b.softline()), Some("}"), None);
+                let open = Insertable::new(None, Some("{"), Some(b.maybeline()));
+                let close = Insertable::new(Some(b.maybeline()), Some("}"), None);
                 let doc = b.group_surround_preserve(&docs, sep, open, close, self.is_multiline);
                 result.push(doc);
             }

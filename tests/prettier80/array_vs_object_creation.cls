@@ -1,6 +1,6 @@
 class A {
   {
-    new List<Id> { '0010B00001kL7i0QAC' };
+    new List<Id> {'0010B00001kL7i0QAC'};
 
     String[] values = new String[0];
 

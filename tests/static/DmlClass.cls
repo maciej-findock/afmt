@@ -95,7 +95,7 @@ class DMLClass {
   }
   void undeleteTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1 ALL ROWS].Id;
-    Id[] accountIds = new List<Id> { accountId };
+    Id[] accountIds = new List<Id> {accountId};
     Account account = new Account(Id = accountId, Name = 'Acme');
     Account[] account =
       new List<Account> {
@@ -116,7 +116,7 @@ class DMLClass {
   }
   void mergeTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
-    Id[] accountIds = new List<Id> { accountId };
+    Id[] accountIds = new List<Id> {accountId};
     Account account = new Account(Id = accountId, Name = 'Acme');
     Account anotherAccount = new Account(Id = accountId, Name = 'Another Acme');
     Account[] account =
@@ -134,9 +134,9 @@ class DMLClass {
     merge new Account(Id = accountId, Name = 'Acme One')
       new Account(Id = accountId, Name = 'Acme Two');
     merge new Account(Id = accountId, Name = 'Acme One')
-      new List<Account> { new Account(Id = accountId, Name = 'Acme Two') };
+      new List<Account> {new Account(Id = accountId, Name = 'Acme Two')};
     merge new Account(Id = accountId, Name = 'Acme One') '0010B00001kL7i0QAC';
     merge new Account(Id = accountId, Name = 'Acme One')
-      new List<Id> { '0010B00001kL7i0QAC' };
+      new List<Id> {'0010B00001kL7i0QAC'};
   }
 }
