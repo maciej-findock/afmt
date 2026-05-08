@@ -910,6 +910,7 @@ pub enum MethodInvocationKind {
         name: ValueNode,
         arguments: ArgumentList,
         context: Option<ChainingContext>,
+        is_newline_nav: bool,
     },
 }
 
@@ -927,6 +928,7 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                 name,
                 arguments,
                 context,
+                is_newline_nav,
             } => {
                 let mut docs = vec![];
                 docs.push(object.build(b));
@@ -967,6 +969,9 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
 
                     result.push(b.concat(docs))
                 } else {
+                    if b.preserve_newlines() && *is_newline_nav {
+                        docs.push(b.nl());
+                    }
                     docs.push(property_navigation.build(b));
 
                     if let Some(ref n) = type_arguments {
@@ -974,7 +979,11 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                     }
                     docs.push(name.build(b));
                     docs.push(arguments.build(b));
-                    result.push(b.concat(docs))
+                    if b.preserve_newlines() && *is_newline_nav {
+                        result.push(b.group_indent_concat(docs));
+                    } else {
+                        result.push(b.concat(docs));
+                    }
                 }
             }
         }
@@ -1007,6 +1016,10 @@ impl MethodInvocation {
                 .try_c_by_k("type_arguments")
                 .map(|n| TypeArguments::new(n));
             let context = build_chaining_context(&node);
+            let is_newline_nav = node
+                .try_c_by_n("name")
+                .map(|nav| obj.end_position().row != nav.start_position().row)
+                .unwrap_or(false);
 
             MethodInvocationKind::Complex {
                 object,
@@ -1015,6 +1028,7 @@ impl MethodInvocation {
                 name,
                 arguments,
                 context,
+                is_newline_nav,
             }
         } else {
             MethodInvocationKind::Simple { name, arguments }
