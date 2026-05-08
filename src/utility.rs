@@ -309,6 +309,29 @@ pub fn build_with_comments_core<'a, F>(
     let bucket = get_comment_bucket(&node_context.id);
     handle_pre_comments(b, bucket, result);
 
+    // If the immediately preceding comment is `// afmt:ignore`, emit the node's
+    // original source text verbatim and skip formatting entirely.
+    let has_ignore = bucket
+        .pre_comments
+        .last()
+        .map(|c| c.value.trim() == "// afmt:ignore")
+        .unwrap_or(false);
+    if has_ignore {
+        let src = get_source_code();
+        let raw = &src[node_context.start_byte..node_context.end_byte];
+        let mut lines = raw.split('\n');
+        let mut docs = Vec::new();
+        if let Some(first) = lines.next() {
+            docs.push(b.txt(first));
+            for line in lines {
+                docs.push(b.nl_with_no_indent());
+                docs.push(b.txt(line));
+            }
+        }
+        result.push(b.concat(docs));
+        return;
+    }
+
     if bucket.dangling_comments.is_empty() {
         handle_members(b, result);
     } else {

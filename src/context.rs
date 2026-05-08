@@ -16,6 +16,8 @@ pub type CommentMap = HashMap<usize, CommentBucket>;
 #[derive(Debug)]
 pub struct NodeContext {
     pub id: usize,
+    pub start_byte: usize,
+    pub end_byte: usize,
     pub punc: Option<Punctuation>,
 }
 
@@ -24,6 +26,8 @@ impl NodeContext {
     pub fn with_punctuation(node: &Node) -> Self {
         Self {
             id: node.id(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
             punc: Punctuation::from(node),
         }
     }
@@ -32,6 +36,8 @@ impl NodeContext {
     pub fn with_inner_punctuation(node: &Node) -> Self {
         Self {
             id: node.id(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
             punc: Punctuation::from_inner(node),
         }
     }
@@ -40,6 +46,8 @@ impl NodeContext {
     pub fn without_punctuation(node: &Node) -> Self {
         Self {
             id: node.id(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
             punc: None,
         }
     }
