@@ -1,8 +1,9 @@
 # 🚀 A Fast Configurable Salesforce Apex Formatter
 
-![Release](https://img.shields.io/github/v/release/xixiaofinland/afmt)
-![License](https://img.shields.io/github/license/xixiaofinland/afmt)
-![Stars](https://img.shields.io/github/stars/xixiaofinland/afmt?style=social)
+> Fork of [afmt](https://github.com/xixiaofinland/afmt) adapted for [FinDock](https://findock.com) Apex style.
+
+![Release](https://img.shields.io/github/v/release/maciej-findock/afmt)
+![License](https://img.shields.io/github/license/maciej-findock/afmt)
 
 <div align="center">
   <img src="md/afmt-logo.png" alt="afmt_logo" width="300"/>
