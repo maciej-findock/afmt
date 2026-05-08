@@ -1155,8 +1155,7 @@ impl ArgumentList {
             && children[0]
                 .child_by_field_name("object")
                 .map(|obj| {
-                    obj.kind() == "method_invocation"
-                        || obj.kind() == "object_creation_expression"
+                    obj.kind() == "method_invocation" || obj.kind() == "object_creation_expression"
                 })
                 .unwrap_or(false);
         let single_chain_is_multiline = single_arg_is_chain

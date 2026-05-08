@@ -827,8 +827,7 @@ impl<M> BodyMember<M> {
                         | "static_initializer"
                         | "block"
                 )
-                || (node.kind() == "method_declaration"
-                    && node.try_c_by_n("body").is_some()),
+                || (node.kind() == "method_declaration" && node.try_c_by_n("body").is_some()),
         }
     }
 
