@@ -165,7 +165,11 @@ impl Formatter {
         let root: Root = enrich(&ast_tree);
 
         // traverse enriched data and create pretty print combinators
-        let c = PrettyConfig::new(config.indent_size, config.preserve_newlines, config.format_doc_comments);
+        let c = PrettyConfig::new(
+            config.indent_size,
+            config.preserve_newlines,
+            config.format_doc_comments,
+        );
         let b = DocBuilder::new(c);
         let doc_ref = root.build(&b);
 

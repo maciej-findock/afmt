@@ -13,6 +13,7 @@ class SharingClass {
 
   abstract with sharing class AbstractWithSharingClass {
   }
+
   without sharing class WithoutSharingClass {
   }
   with sharing class WithSharingClass {

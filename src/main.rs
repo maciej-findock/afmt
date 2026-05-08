@@ -32,8 +32,7 @@ fn run(args: &Args) -> Result<(), String> {
         std::io::stdin()
             .read_to_string(&mut source)
             .map_err(|e| format!("Failed to read stdin: {}", e))?;
-        let formatter =
-            Formatter::create_from_config(args.config.as_deref(), vec![])?;
+        let formatter = Formatter::create_from_config(args.config.as_deref(), vec![])?;
         let output = Formatter::format_one(&source, formatter.config().clone());
         print!("{}", output);
         return Ok(());

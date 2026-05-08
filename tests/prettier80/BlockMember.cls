@@ -15,11 +15,13 @@ class BlockMember {
       System.debug('Statement Block Member');
     }
   }
+
   class StaticStatementBlockMember {
     static {
       System.debug('Static Statement Block Member');
     }
   }
+
   interface InnerInterface {
     void interfaceMethod();
   }

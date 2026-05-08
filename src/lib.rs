@@ -1,3 +1,5 @@
+#![allow(clippy::large_enum_variant, clippy::unnecessary_unwrap)]
+
 mod accessor;
 pub mod args;
 mod context;

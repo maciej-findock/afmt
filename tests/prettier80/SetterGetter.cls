@@ -14,11 +14,13 @@ class A {
     }
     private set;
   }
+
   String propertyMemberWithOnlySet {
     set {
       memberThree = value;
     }
   }
+
   private String privatePropertyMemberWithOnlyGet {
     get {
       return 2;
