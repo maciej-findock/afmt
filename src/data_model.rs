@@ -4135,24 +4135,35 @@ pub struct TriggerDeclaration {
     pub object: ValueNode,
     pub body: TriggerBody,
     pub node_context: NodeContext,
+    // For each event, true when it starts on a different row than the preceding
+    // event (or the object name for index 0). Drives per-event line-break preservation.
+    event_row_breaks: Vec<bool>,
 }
 
 impl TriggerDeclaration {
     pub fn new(node: Node) -> Self {
         assert_check(node, "trigger_declaration");
 
-        let events = node
-            .cs_by_k("trigger_event")
+        let event_nodes = node.cs_by_k("trigger_event");
+        let object_node = node.c_by_n("object");
+        let mut event_row_breaks = Vec::new();
+        let mut prev_row = object_node.end_position().row;
+        for en in &event_nodes {
+            event_row_breaks.push(en.start_position().row > prev_row);
+            prev_row = en.end_position().row;
+        }
+        let events = event_nodes
             .into_iter()
             .map(|n| TriggerEvent::new(n))
             .collect();
 
         Self {
             name: ValueNode::new(node.c_by_n("name")),
-            object: ValueNode::new(node.c_by_n("object")),
+            object: ValueNode::new(object_node),
             events,
             body: TriggerBody::new(node.c_by_n("body")),
             node_context: NodeContext::with_punctuation(&node),
+            event_row_breaks,
         }
     }
 }
@@ -4165,12 +4176,37 @@ impl<'a> DocBuild<'a> for TriggerDeclaration {
             result.push(b._txt_("on"));
             result.push(self.object.build(b));
 
-            let docs = b.to_docs(&self.events);
-            let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
-            let open = Insertable::new(None, Some("("), Some(b.maybeline()));
-            let close = Insertable::new(Some(b.maybeline()), Some(")"), None);
-            let doc = b.group_surround(&docs, sep, open, close);
-            result.push(doc);
+            let events_are_multiline = self.event_row_breaks.iter().any(|&r| r);
+            if b.preserve_newlines() && events_are_multiline {
+                // Build with per-event hard newlines matching the source layout.
+                // Events on the same source row are space-separated; events that
+                // started a new row in source get a hard nl() (indented +4).
+                let mut event_docs = Vec::new();
+                for (i, event) in self.events.iter().enumerate() {
+                    if self.event_row_breaks[i] {
+                        event_docs.push(b.nl());
+                    } else if i > 0 {
+                        event_docs.push(b.txt(" "));
+                    }
+                    event_docs.push(event.build(b));
+                }
+                // If the first event is already on its own row, `)` gets its own line too.
+                let close_doc = if self.event_row_breaks.first().copied().unwrap_or(false) {
+                    b.concat(vec![b.nl(), b.txt(")")])
+                } else {
+                    b.txt(")")
+                };
+                result.push(b.txt(" ("));
+                result.push(b.indent(b.indent(b.concat(event_docs))));
+                result.push(close_doc);
+            } else {
+                let docs = b.to_docs(&self.events);
+                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                let open = Insertable::new(Some(b.txt(" ")), Some("("), Some(b.maybeline()));
+                let close = Insertable::new(Some(b.maybeline()), Some(")"), None);
+                let doc = b.group_surround(&docs, sep, open, close);
+                result.push(doc);
+            }
 
             result.push(b.txt(" "));
             result.push(self.body.build(b));

@@ -1,4 +1,4 @@
-trigger myAccountTrigger on Account(before insert) {
+trigger myAccountTrigger on Account (before insert) {
   System.debug('Inside trigger');
   if (Trigger.isBefore) {
     if (Trigger.isDelete) {
