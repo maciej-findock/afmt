@@ -5363,6 +5363,10 @@ pub struct MapInitializer {
     is_multiline: bool,
     is_inside_parens: bool,
     is_inside_argument_list: bool,
+    // true when map_creation_expression starts on the same row as the containing
+    // argument_list's `(` — e.g. `doThing(new Map<> {`). False when the map is
+    // on its own line inside a multiline arg list.
+    arg_list_same_row: bool,
     same_line_nesting_depth: u32,
 }
 
@@ -5396,6 +5400,18 @@ impl MapInitializer {
             .as_deref()
             .map(|k| k == "argument_list")
             .unwrap_or(false);
+        // true when the map_creation_expression starts on the same row as its
+        // containing argument_list's opening `(`.
+        let arg_list_same_row = node
+            .parent() // map_creation_expression
+            .and_then(|map_expr| {
+                let map_row = map_expr.start_position().row;
+                map_expr
+                    .parent() // argument_list
+                    .filter(|al| al.kind() == "argument_list")
+                    .map(|al| al.start_position().row == map_row)
+            })
+            .unwrap_or(false);
         // Count outer argument_lists beyond the direct container that share the same row.
         // outer(inner(new Map{...})): direct arglist = inner's, outer arglist adds depth=1.
         let same_line_nesting_depth = {
@@ -5423,6 +5439,7 @@ impl MapInitializer {
             is_multiline,
             is_inside_parens,
             is_inside_argument_list,
+            arg_list_same_row,
             same_line_nesting_depth,
         }
     }
@@ -5452,10 +5469,11 @@ impl<'a> DocBuild<'a> for MapInitializer {
                 // preventing force_break propagation into outer argument lists.
                 let sep = Insertable::new::<&str>(None, None, Some(b.nl()));
                 let entries = b.intersperse(&docs, sep);
-                if self.is_inside_argument_list {
-                    // Each outer same-row argument_list contributes an extra +4 via
-                    // its surround/indent. Apply depth dedents to entries and depth+1
-                    // to `}` so they land at statement_base+4 and statement_base.
+                if self.is_inside_argument_list && self.arg_list_same_row {
+                    // Map's `{` is on the SAME row as the containing arg list's `(`,
+                    // e.g. `doThing(new Map<> {`. The arg list's surround already
+                    // contributes one indent level; apply depth dedents so entries and
+                    // `}` land at the correct absolute columns.
                     let mut entries_nl = b.nl();
                     for _ in 0..self.same_line_nesting_depth {
                         entries_nl = b.dedent(entries_nl);
@@ -5472,6 +5490,8 @@ impl<'a> DocBuild<'a> for MapInitializer {
                         b.txt("}"),
                     ]));
                 } else {
+                    // Map is standalone (not inside arg list) or is on its OWN line
+                    // inside a multiline arg list. Indent normally: entries at +4, `}` at 0.
                     result.push(b.concat(vec![
                         b.txt("{"),
                         b.indent(b.nl()),
