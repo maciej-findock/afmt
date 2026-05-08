@@ -810,6 +810,8 @@ impl<'a> DocBuild<'a> for Interface {
 #[derive(Debug)]
 pub struct TypeList {
     pub types: Vec<Type>,
+    pub is_multiline: bool,
+    pub item_row_breaks: Vec<bool>,
     pub node_context: NodeContext,
 }
 
@@ -817,14 +819,18 @@ impl TypeList {
     pub fn new(node: Node) -> Self {
         assert_check(node, "type_list");
 
-        let types = node
-            .children_vec()
-            .into_iter()
-            .map(|n| Type::new(n))
+        let children = node.children_vec();
+        let is_multiline = node.start_position().row != node.end_position().row;
+        let item_row_breaks: Vec<bool> = children
+            .windows(2)
+            .map(|w| w[0].end_position().row < w[1].start_position().row)
             .collect();
+        let types = children.into_iter().map(|n| Type::new(n)).collect();
 
         Self {
             types,
+            is_multiline,
+            item_row_breaks,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -834,9 +840,23 @@ impl<'a> DocBuild<'a> for TypeList {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.types);
-            let sep = Insertable::new(None, Some(" "), None);
-            let doc = b.intersperse(&docs, sep);
-            result.push(doc);
+            if b.preserve_newlines() && self.is_multiline {
+                let mut parts = vec![];
+                for (i, doc) in docs.iter().enumerate() {
+                    if i > 0 {
+                        if self.item_row_breaks[i - 1] {
+                            parts.push(b.indent(b.nl()));
+                        } else {
+                            parts.push(b.txt(" "));
+                        }
+                    }
+                    parts.push(*doc);
+                }
+                result.push(b.concat(parts));
+            } else {
+                let sep = Insertable::new(None, Some(" "), None);
+                result.push(b.intersperse(&docs, sep));
+            }
         });
     }
 }
