@@ -27,11 +27,18 @@ mod tests {
     }
 
     #[test]
+    fn preserve() {
+        let (total, failed) = run_scenario("tests/preserve", "preserve");
+        assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
+    }
+
+    #[test]
     fn all() {
         let scenarios = [
             ("tests/static", "static"),
             ("tests/prettier80", "prettier80"),
             ("tests/comments", "comments"),
+            ("tests/preserve", "preserve"),
         ];
 
         let mut total_tests = 0;
@@ -93,6 +100,7 @@ mod tests {
             "static" => run_static_test_files(source),
             "prettier80" => run_prettier_test_files(source, "p80"),
             "comments" => run_static_test_files(source),
+            "preserve" => run_config_test_files(source, "preserve"),
             _ => panic!("Unknown scenario: {}", scenario_name),
         });
 
@@ -121,6 +129,21 @@ mod tests {
         });
 
         compare("Static:", output, expected, source)
+    }
+
+    fn run_config_test_files(source: &Path, config_name: &str) -> bool {
+        let expected_file = source.with_extension("cls");
+        let output = format_with_afmt(
+            source,
+            Some(&format!("tests/configs/.afmt_{}.toml", config_name)),
+        );
+        let expected = std::fs::read_to_string(&expected_file).unwrap_or_else(|_| {
+            panic!(
+                "Failed to read expected .cls file at {}",
+                red(&expected_file.to_string_lossy())
+            )
+        });
+        compare("Config:", output, expected, source)
     }
 
     fn run_prettier_test_files(source: &Path, config_name: &str) -> bool {

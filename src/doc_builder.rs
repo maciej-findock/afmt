@@ -2,6 +2,7 @@ use crate::{
     data_model::DocBuild,
     doc::{Doc, DocRef, PrettyConfig},
     enum_def::BodyMember,
+    utility::get_comment_bucket,
 };
 use typed_arena::Arena;
 
@@ -27,6 +28,25 @@ impl<'a> DocBuilder<'a> {
         close: Insertable<'a>,
     ) -> DocRef<'a> {
         self.group(self.surround(elems, sep, open, close))
+    }
+
+    // Like group_surround but forces multiline when force_break is true and
+    // preserve_newlines is enabled. The ForceBreak inside the group causes
+    // fits() to return false, guaranteeing the multiline path is always taken.
+    pub fn group_surround_preserve(
+        &'a self,
+        elems: &[DocRef<'a>],
+        sep: Insertable<'a>,
+        open: Insertable<'a>,
+        close: Insertable<'a>,
+        force_break: bool,
+    ) -> DocRef<'a> {
+        let inner = self.surround(elems, sep, open, close);
+        if force_break && self.config.preserve_newlines {
+            self.group(self.concat(vec![self.force_break(), inner]))
+        } else {
+            self.group(inner)
+        }
     }
 
     pub fn surround(
@@ -106,14 +126,38 @@ impl<'a> DocBuilder<'a> {
             return self.concat(vec![self.txt(open), self.nl(), self.txt(close)]);
         }
 
-        let multi_line = self.concat(vec![
-            self.txt(open),
-            self.indent(self.nl()),
-            self.indent(self.intersperse_body_members(elems)),
-            self.nl(),
-            self.txt(close),
-        ]);
-        multi_line
+        // When preserve_newlines is on, a line comment on the same row as `{`
+        // (stored as a pre-comment of the first body member with is_on_parent_open_line)
+        // should stay on the `{` line rather than moving to the next line.
+        let open_line_comment = if self.preserve_newlines() {
+            elems.first().and_then(|first| {
+                let bucket = get_comment_bucket(&first.node_id);
+                bucket.pre_comments.first().filter(|c| c.is_on_parent_open_line()).map(|c| {
+                    c.mark_as_printed(); // prevent handle_pre_comments from re-rendering it
+                    self.concat(vec![self.txt(" "), self.txt(&c.value)])
+                })
+            })
+        } else {
+            None
+        };
+
+        let leading = if self.preserve_newlines()
+            && elems.first().is_some_and(|m| m.has_leading_newline)
+        {
+            self.indent(self.empty_new_line())
+        } else {
+            self.indent(self.nl())
+        };
+
+        let mut parts = vec![self.txt(open)];
+        if let Some(c) = open_line_comment {
+            parts.push(c);
+        }
+        parts.push(leading);
+        parts.push(self.indent(self.intersperse_body_members(elems)));
+        parts.push(self.nl());
+        parts.push(self.txt(close));
+        self.concat(parts)
     }
 
     pub fn intersperse_body_members<'b, M>(&'a self, members: &[BodyMember<M>]) -> DocRef<'a>
@@ -157,6 +201,14 @@ impl<'a> DocBuilder<'a> {
         self.group(self.indent(doc_ref))
     }
 
+    pub fn preserve_newlines(&self) -> bool {
+        self.config.preserve_newlines
+    }
+
+    pub fn format_doc_comments(&self) -> bool {
+        self.config.format_doc_comments
+    }
+
     pub fn group_concat(&'a self, doc_refs: impl IntoIterator<Item = DocRef<'a>>) -> DocRef<'a> {
         self.group(self.concat(doc_refs))
     }
@@ -185,7 +237,7 @@ impl<'a> DocBuilder<'a> {
         self.concat(vec![self.nl_with_no_indent(), self.nl()])
     }
 
-    fn nl_with_no_indent(&'a self) -> DocRef<'a> {
+    pub fn nl_with_no_indent(&'a self) -> DocRef<'a> {
         self.arena.alloc(Doc::NewlineWithNoIndent)
     }
 

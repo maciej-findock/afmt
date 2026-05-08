@@ -1,4 +1,4 @@
-trigger myAccountTrigger on Account(
+trigger myAccountTrigger on Account (
   before delete,
   before insert,
   before update,

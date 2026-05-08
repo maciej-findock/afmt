@@ -1,0 +1,4 @@
+# Config for preserve_newlines tests
+max_width = 0
+indent_size = 4
+preserve_newlines = true

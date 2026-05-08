@@ -309,6 +309,29 @@ pub fn build_with_comments_core<'a, F>(
     let bucket = get_comment_bucket(&node_context.id);
     handle_pre_comments(b, bucket, result);
 
+    // If the immediately preceding comment is `// afmt:ignore`, emit the node's
+    // original source text verbatim and skip formatting entirely.
+    let has_ignore = bucket
+        .pre_comments
+        .last()
+        .map(|c| c.value.trim() == "// afmt:ignore")
+        .unwrap_or(false);
+    if has_ignore {
+        let src = get_source_code();
+        let raw = &src[node_context.start_byte..node_context.end_byte];
+        let mut lines = raw.split('\n');
+        let mut docs = Vec::new();
+        if let Some(first) = lines.next() {
+            docs.push(b.txt(first));
+            for line in lines {
+                docs.push(b.nl_with_no_indent());
+                docs.push(b.txt(line));
+            }
+        }
+        result.push(b.concat(docs));
+        return;
+    }
+
     if bucket.dangling_comments.is_empty() {
         handle_members(b, result);
     } else {
@@ -410,6 +433,9 @@ pub fn handle_pre_comments<'a>(
 
     let mut docs = Vec::new();
     for (i, comment) in bucket.pre_comments.iter().enumerate() {
+        if comment.is_printed() {
+            continue;
+        }
         if comment.has_leading_content() {
             docs.push(b.txt(" "));
         } else {
@@ -458,6 +484,12 @@ pub fn handle_post_comments<'a>(
             docs.push(b.txt(" "));
         } else if comment.has_newline_above() {
             docs.push(b.empty_new_line());
+        } else if b.preserve_newlines() && comment.dedent_levels() > 0 {
+            let mut nl = b.nl();
+            for _ in 0..comment.dedent_levels() {
+                nl = b.dedent(nl);
+            }
+            docs.push(nl);
         } else {
             docs.push(b.nl());
         }
@@ -563,10 +595,26 @@ pub fn build_chaining_context(node: &Node) -> Option<ChainingContext> {
     }
 
     let is_top_most_in_a_chain = has_a_chaining_child && !is_parent_a_chaining_node;
+    // True when the `.method()` navigation starts on a different row than the object
+    // expression STARTS — i.e. the developer put the chain link on its own line.
+    // Using start (not end) correctly handles ").add(" patterns where the nav follows
+    // immediately after a multiline argument's closing paren: the obj STARTS many rows
+    // earlier so obj.start != nav.start, signalling a genuine chain-level line break.
+    // method_invocation uses "name" child; field_access uses "field" child
+    let is_multiline = node
+        .try_c_by_n("object")
+        .and_then(|obj| {
+            node.try_c_by_n("name")
+                .or_else(|| node.try_c_by_n("field"))
+                .map(|nav| (obj, nav))
+        })
+        .map(|(obj, nav)| obj.start_position().row != nav.start_position().row)
+        .unwrap_or(false);
 
     Some(ChainingContext {
         is_top_most_in_a_chain,
         is_parent_a_chaining_node,
+        is_multiline,
     })
 }
 

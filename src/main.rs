@@ -1,6 +1,7 @@
 use sf_afmt::args::{get_args, Args};
 use sf_afmt::format;
 use sf_afmt::formatter::Formatter;
+use std::io::Read;
 use std::time::Instant;
 use std::{fs, process};
 
@@ -26,6 +27,18 @@ fn main() {
 }
 
 fn run(args: &Args) -> Result<(), String> {
+    if args.path == "-" {
+        let mut source = String::new();
+        std::io::stdin()
+            .read_to_string(&mut source)
+            .map_err(|e| format!("Failed to read stdin: {}", e))?;
+        let formatter =
+            Formatter::create_from_config(args.config.as_deref(), vec![])?;
+        let output = Formatter::format_one(&source, formatter.config().clone());
+        print!("{}", output);
+        return Ok(());
+    }
+
     let formatter = Formatter::create_from_config(args.config.as_deref(), vec![args.path.clone()])?;
     let results = format(formatter);
 

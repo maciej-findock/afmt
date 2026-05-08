@@ -1,5 +1,5 @@
 public class Me {
   {
-    merge masterContact new List<Contact>{ oldContact1, oldContact2 };
+    merge masterContact new List<Contact> {oldContact1, oldContact2};
   }
 }

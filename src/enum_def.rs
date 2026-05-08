@@ -797,6 +797,8 @@ impl<'a> DocBuild<'a> for AnnotationArgumentList {
 pub struct BodyMember<M> {
     pub member: M,
     pub has_trailing_newline: bool, // already take comment nodes into consideration
+    pub has_leading_newline: bool,  // blank line between opening brace and first member
+    pub node_id: usize,
 }
 
 impl<M> BodyMember<M> {
@@ -804,7 +806,34 @@ impl<M> BodyMember<M> {
         Self {
             member,
             has_trailing_newline: Self::has_trailing_newline(node),
+            has_leading_newline: Self::has_leading_newline(node),
+            node_id: node.id(),
         }
+    }
+
+    fn has_leading_newline(node: &Node) -> bool {
+        // A real (non-comment) prev sibling means this is not the first member.
+        if node.prev_named_sibling().is_some_and(|s| !s.is_extra()) {
+            return false;
+        }
+        // Walk back through preceding extra (comment) siblings to find the
+        // earliest first-content row. If comments precede this node, the blank
+        // line check must use the first comment's row, not the node's own row.
+        let first_content_row = {
+            let mut earliest = node.start_position().row;
+            let mut cur = node.prev_named_sibling();
+            while let Some(prev) = cur {
+                if !prev.is_extra() {
+                    break;
+                }
+                earliest = prev.start_position().row;
+                cur = prev.prev_named_sibling();
+            }
+            earliest
+        };
+        node.parent().is_some_and(|parent| {
+            first_content_row > parent.start_position().row + 1
+        })
     }
 
     // take comment nodes into consideration

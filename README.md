@@ -144,21 +144,108 @@ Afmt completed successfully.
 ```
 <br>
 
-## 🔧 Configuration:
+## 🔧 Configuration
 
-`-c` parameter can read configuration settings from a toml file.
+`afmt` reads configuration from a `.afmt.toml` file passed with the `-c` flag:
 
-Example: `afmt -c .afmt.toml`
+```bash
+afmt -c .afmt.toml ./file.cls
+```
 
-In `.afmt.toml` config file, two options are supported
+### All options
 
 ```toml
-# Maximum line width
+# Maximum line width before wrapping (0 = unlimited)
 max_width = 80
 
 # Indentation size in spaces
 indent_size = 4
+
+# Preserve developer-chosen vertical layout.
+# When true, any argument list, parameter list, array initializer, or map
+# initializer that was written multiline in the source stays multiline in the
+# output. Only horizontal formatting (spacing, indentation) is corrected.
+preserve_newlines = false
+
+# Normalise JavaDoc comments (/** ... */) to standard alignment.
+# When false (default), block comment content is preserved verbatim.
+# When true, each line is trimmed and prefixed with " * ", the opening
+# /** is placed on its own line, and the closing */ is normalised to " */".
+format_doc_comments = false
 ```
+
+### `preserve_newlines`
+
+By default `afmt` (like Prettier) may collapse or reflow multiline constructs
+to fit within `max_width`. With `preserve_newlines = true` the formatter
+respects the line breaks the developer already placed:
+
+```apex
+// source — argument list split across lines
+result = someMethod(
+    argumentOne,
+    argumentTwo,
+    argumentThree
+);
+
+// preserve_newlines = false → may collapse to one line if it fits
+result = someMethod(argumentOne, argumentTwo, argumentThree);
+
+// preserve_newlines = true → multiline layout is kept
+result = someMethod(
+    argumentOne,
+    argumentTwo,
+    argumentThree
+);
+```
+
+Affected constructs: argument lists, parameter lists, array/set/map
+initializers, method chains, binary expressions, and `implements` clauses.
+
+### `format_doc_comments`
+
+By default block comment content (including JavaDoc `/**`) is preserved
+verbatim — only its position in the file is adjusted. With
+`format_doc_comments = true` the formatter normalises JavaDoc comments to
+standard alignment:
+
+```apex
+// source — non-standard indentation
+/**
+* @description Does something.
+* @param x The value.
+*/
+
+// format_doc_comments = false (default) → preserved as-is
+/**
+* @description Does something.
+* @param x The value.
+*/
+
+// format_doc_comments = true → normalised
+/**
+ * @description Does something.
+ * @param x The value.
+ */
+```
+
+### `// afmt:ignore`
+
+Place `// afmt:ignore` on the line immediately before any statement or
+declaration to preserve that node's original source text exactly as written,
+skipping all formatting for it:
+
+```apex
+// afmt:ignore
+List<Map<String, String>> defs = new List<Map<String, String>> {
+        'key' => builder.listOfRules()
+                    .add(builder.rule('A').query(SObjectA.Id).build())
+                    .add(builder.rule('B').query(SObjectB.Id).build())
+};
+```
+
+afmt will format the surrounding code normally but leave the ignored node
+untouched. The `// afmt:ignore` comment itself is preserved in the output.
 
 <br>
 
@@ -166,7 +253,7 @@ indent_size = 4
 
 - "TLTR, what features afmt has?" Run `afmt -h`.
 - "How do I set up afmt in VSCode?"
-[Setup in VSCode](./md/VSCode_Setup.md)
+  [Setup in VSCode](./md/VSCode_Setup.md)
 
 - "Can afmt formats exactly the same as Prettier Apex?"
 No.

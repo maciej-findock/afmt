@@ -2,14 +2,14 @@ class DMLClass {
   void insertTest() {
     Account account = new Account(Name = 'Acme');
     Account[] account =
-      new List<Account>{
+      new List<Account> {
         new Account(Name = 'Inner Acme One'),
         new Account(Name = 'Inner Acme Two')
       };
     insert account;
     insert accounts;
     insert new Account(Name = 'Acme One');
-    insert new List<Account>{
+    insert new List<Account> {
       new Account(Name = 'Inner Acme Three'),
       new Account(Name = 'Inner Acme Four')
     };
@@ -20,14 +20,14 @@ class DMLClass {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
     Account account = new Account(Id = accountId, Name = 'Acme');
     Account[] account =
-      new List<Account>{
+      new List<Account> {
         new Account(Id = accountId, Name = 'Inner Acme One'),
         new Account(Id = accountId, Name = 'Inner Acme Two')
       };
     update account;
     update accounts;
     update new Account(Id = accountId, Name = 'Acme One');
-    update new List<Account>{
+    update new List<Account> {
       new Account(Id = accountId, Name = 'Inner Acme Three'),
       new Account(Id = accountId, Name = 'Inner Acme Four')
     };
@@ -38,14 +38,14 @@ class DMLClass {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
     Account account = new Account(Id = accountId, Name = 'Acme');
     Account[] account =
-      new List<Account>{
+      new List<Account> {
         new Account(Name = 'Inner Acme One'),
         new Account(Id = accountId, Name = 'Inner Acme Two')
       };
     upsert account;
     upsert accounts;
     upsert new Account(Id = accountId, Name = 'Acme One');
-    upsert new List<Account>{
+    upsert new List<Account> {
         new Account(Name = 'Inner Acme Three'),
         new Account(Id = accountId, Name = 'Inner Acme Four')
       };
@@ -61,7 +61,7 @@ class DMLClass {
         Description = 'Test Description'
       );
     Account[] account =
-      new List<Account>{
+      new List<Account> {
         new Account(Name = 'Inner Acme One'),
         new Account(Id = accountId, Name = 'Inner Acme Two')
       };
@@ -69,7 +69,7 @@ class DMLClass {
     upsert accounts Account.Field.External_Id__c;
     upsert new Account(Id = accountId, Name = 'Acme One')
       Account.Fields.External_Id__c;
-    upsert new List<Account>{
+    upsert new List<Account> {
         new Account(Name = 'Inner Acme Three'),
         new Account(Id = accountId, Name = 'Inner Acme Four')
       }
@@ -79,14 +79,14 @@ class DMLClass {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
     Account account = new Account(Id = accountId, Name = 'Acme');
     Account[] account =
-      new List<Account>{
+      new List<Account> {
         new Account(Id = accountId, Name = 'Inner Acme One'),
         new Account(Id = accountId, Name = 'Inner Acme Two')
       };
     delete account;
     delete accounts;
     delete new Account(Id = accountId, Name = 'Acme One');
-    delete new List<Account>{
+    delete new List<Account> {
       new Account(Id = accountId, Name = 'Inner Acme Three'),
       new Account(Id = accountId, Name = 'Inner Acme Four')
     };
@@ -95,10 +95,10 @@ class DMLClass {
   }
   void undeleteTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1 ALL ROWS].Id;
-    Id[] accountIds = new List<Id>{ accountId };
+    Id[] accountIds = new List<Id> {accountId};
     Account account = new Account(Id = accountId, Name = 'Acme');
     Account[] account =
-      new List<Account>{
+      new List<Account> {
         new Account(Id = accountId, Name = 'Inner Acme One'),
         new Account(Id = accountId, Name = 'Inner Acme Two')
       };
@@ -107,7 +107,7 @@ class DMLClass {
     undelete accounts;
     undelete accountIds;
     undelete new Account(Id = accountId, Name = 'Acme One');
-    undelete new List<Account>{
+    undelete new List<Account> {
       new Account(Id = accountId, Name = 'Inner Acme Three'),
       new Account(Id = accountId, Name = 'Inner Acme Four')
     };
@@ -116,11 +116,11 @@ class DMLClass {
   }
   void mergeTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
-    Id[] accountIds = new List<Id>{ accountId };
+    Id[] accountIds = new List<Id> {accountId};
     Account account = new Account(Id = accountId, Name = 'Acme');
     Account anotherAccount = new Account(Id = accountId, Name = 'Another Acme');
     Account[] account =
-      new List<Account>{
+      new List<Account> {
         new Account(Id = accountId, Name = 'Inner Acme One'),
         new Account(Id = accountId, Name = 'Inner Acme Two')
       };
@@ -134,9 +134,9 @@ class DMLClass {
     merge new Account(Id = accountId, Name = 'Acme One')
       new Account(Id = accountId, Name = 'Acme Two');
     merge new Account(Id = accountId, Name = 'Acme One')
-      new List<Account>{ new Account(Id = accountId, Name = 'Acme Two') };
+      new List<Account> {new Account(Id = accountId, Name = 'Acme Two')};
     merge new Account(Id = accountId, Name = 'Acme One') '0010B00001kL7i0QAC';
     merge new Account(Id = accountId, Name = 'Acme One')
-      new List<Id>{ '0010B00001kL7i0QAC' };
+      new List<Id> {'0010B00001kL7i0QAC'};
   }
 }

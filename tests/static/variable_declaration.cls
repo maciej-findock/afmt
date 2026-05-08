@@ -18,11 +18,11 @@ class A {
       WHERE CreatedDate = LAST_N_DAYS:60
     ];
 
-    Integer[] b = new List<Integer>{};
+    Integer[] b = new List<Integer> {};
 
-    Id[] accountIds = new Id[]{ accountId };
+    Id[] accountIds = new Id[]{accountId};
 
     Map<String, Integer> intsBymap =
-      new Map<String, Integer>{ 'hello' => 1, 'world' => 2 };
+      new Map<String, Integer> {'hello' => 1, 'world' => 2};
   }
 }

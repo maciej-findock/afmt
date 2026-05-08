@@ -16,6 +16,8 @@ pub type CommentMap = HashMap<usize, CommentBucket>;
 #[derive(Debug)]
 pub struct NodeContext {
     pub id: usize,
+    pub start_byte: usize,
+    pub end_byte: usize,
     pub punc: Option<Punctuation>,
 }
 
@@ -24,6 +26,8 @@ impl NodeContext {
     pub fn with_punctuation(node: &Node) -> Self {
         Self {
             id: node.id(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
             punc: Punctuation::from(node),
         }
     }
@@ -32,6 +36,8 @@ impl NodeContext {
     pub fn with_inner_punctuation(node: &Node) -> Self {
         Self {
             id: node.id(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
             punc: Punctuation::from_inner(node),
         }
     }
@@ -40,6 +46,8 @@ impl NodeContext {
     pub fn without_punctuation(node: &Node) -> Self {
         Self {
             id: node.id(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
             punc: None,
         }
     }
@@ -126,12 +134,69 @@ impl Comment {
         self.metadata.has_prev_node
     }
 
+    pub fn dedent_levels(&self) -> u32 {
+        self.metadata.dedent_levels
+    }
+
+    pub fn is_on_parent_open_line(&self) -> bool {
+        self.metadata.is_on_parent_open_line
+    }
+
     pub fn mark_as_printed(&self) {
         self.is_printed.set(true);
     }
 
     pub fn is_printed(&self) -> bool {
         self.is_printed.get()
+    }
+
+    fn build_javadoc<'a>(b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>, mut lines: Vec<&str>) {
+        // Normalize inline /** content */ to multi-line
+        if !lines.is_empty() {
+            let first = lines[0].trim();
+            if first.len() > 3 {
+                let content = first[3..].trim();
+                if !content.is_empty() {
+                    lines[0] = "/**";
+                    lines.insert(1, content);
+                }
+            }
+        }
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if i == 0 {
+                result.push(b.txt(trimmed));
+            } else if i == lines.len() - 1 {
+                if let Some(before_end) = trimmed.strip_suffix("*/") {
+                    let content = before_end.trim();
+                    if content.is_empty() {
+                        result.push(b.txt(" */"));
+                    } else {
+                        result.push(b.txt(format!(" * {}", content)));
+                        result.push(b.nl());
+                        result.push(b.txt(" */"));
+                    }
+                } else {
+                    result.push(b.txt(" */"));
+                }
+            } else if trimmed.is_empty() {
+                result.push(b.txt(" *"));
+            } else if let Some(after_star) = trimmed.strip_prefix('*') {
+                let content = after_star.trim_start();
+                if content.is_empty() {
+                    result.push(b.txt(" *"));
+                } else {
+                    result.push(b.txt(format!(" * {}", content)));
+                }
+            } else {
+                result.push(b.txt(format!(" * {}", trimmed)));
+            }
+
+            if i < lines.len() - 1 {
+                result.push(b.nl());
+            }
+        }
     }
 }
 
@@ -143,77 +208,16 @@ impl<'a> DocBuild<'a> for Comment {
                 result.push(b.nl());
             }
             CommentType::Block => {
-                let mut lines: Vec<&str> = self.value.split('\n').collect();
-
-                // JavaDoc formatting
-                if self.value.starts_with("/**") {
-                    // Handle the first line that might contain both /** and content
-                    if !lines.is_empty() {
-                        let first_line = lines[0].trim();
-                        if first_line.len() > 3 {
-                            // Has content after /**
-                            // Extract the content after /**
-                            let content = first_line[3..].trim();
-                            if !content.is_empty() {
-                                // Replace first line with just /**
-                                lines[0] = "/**";
-                                // Insert the content as a new second line
-                                lines.insert(1, content);
-                            }
-                        }
-                    }
-
-                    for (i, line) in lines.iter().enumerate() {
-                        let trimmed = line.trim();
-
-                        if i == 0 {
-                            // First line (/**) remains unchanged
-                            result.push(b.txt(trimmed));
-                        } else if i == lines.len() - 1 {
-                            if let Some(before_end) = trimmed.strip_suffix("*/") {
-                                let content = before_end.trim();
-                                if content.is_empty() {
-                                    result.push(b.txt(" */"));
-                                } else {
-                                    result.push(b.txt(format!(" * {}", content))); // First line: Preserve content
-                                    result.push(b.nl()); // Newline before closing */
-                                    result.push(b.txt(" */")); // Second line: Properly close the comment
-                                }
-                            } else {
-                                result.push(b.txt(" */")); // Fallback (shouldn't happen in valid JavaDoc)
-                            }
-                        } else if trimmed.is_empty() {
-                            // Handle empty lines
-                            result.push(b.txt(" *"));
-                        } else {
-                            // Handle content lines
-                            if let Some(after_star) = trimmed.strip_prefix('*') {
-                                // Line has a star - normalize to exactly one space
-                                let content = after_star.trim_start(); // Remove all leading spaces
-                                if content.is_empty() {
-                                    // Just a star with no content
-                                    result.push(b.txt(" *"));
-                                } else {
-                                    // Star with content - add exactly one space
-                                    result.push(b.txt(format!(" * {}", content)));
-                                }
-                            } else {
-                                // Line doesn't have a star, add standard formatting
-                                result.push(b.txt(format!(" * {}", trimmed)));
-                            }
-                        }
-
-                        if i < lines.len() - 1 {
-                            result.push(b.nl());
-                        }
-                    }
+                let lines: Vec<&str> = self.value.split('\n').collect();
+                if b.format_doc_comments() && self.value.starts_with("/**") {
+                    Self::build_javadoc(b, result, lines);
                 } else {
-                    // Regular block comment (non-JavaDoc)
+                    // Preserve verbatim; nl_with_no_indent keeps internal lines
+                    // at their original column without adding current indent.
                     for (i, line) in lines.iter().enumerate() {
-                        result.push(b.txt(line.trim()));
-
+                        result.push(b.txt(*line));
                         if i < lines.len() - 1 {
-                            result.push(b.nl());
+                            result.push(b.nl_with_no_indent());
                         }
                     }
                 }
@@ -230,6 +234,12 @@ pub struct CommentMetadata {
     has_empty_line_below: bool,
     has_prev_node: bool,
     is_followed_by_bracket_composite_node: bool,
+    // How many 4-space indent levels the comment sits to the left of its previous sibling.
+    // Used by preserve_newlines to render post-comments at the original column.
+    pub dedent_levels: u32,
+    // True when the comment shares a row with its parent node's opening token (e.g. `{`).
+    // Used by preserve_newlines to keep `{ //comment` on one line.
+    pub is_on_parent_open_line: bool,
 }
 
 impl CommentMetadata {
@@ -273,6 +283,24 @@ impl CommentMetadata {
             false
         };
 
+        // How many 4-space levels the comment sits to the left of its previous sibling.
+        let dedent_levels = if let Some(prev_node) = prev {
+            let prev_col = prev_node.start_position().column;
+            let comment_col = node.start_position().column;
+            if prev_col > comment_col {
+                ((prev_col - comment_col) / 4) as u32
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        // True when the comment is on the same row as its parent's opening token.
+        let is_on_parent_open_line = node
+            .parent()
+            .is_some_and(|p| p.start_position().row == node.start_position().row);
+
         CommentMetadata {
             has_leading_content,
             has_trailing_content,
@@ -280,6 +308,8 @@ impl CommentMetadata {
             has_empty_line_below,
             has_prev_node,
             is_followed_by_bracket_composite_node,
+            dedent_levels,
+            is_on_parent_open_line,
         }
     }
 }

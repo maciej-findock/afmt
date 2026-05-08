@@ -1,4 +1,4 @@
-trigger InlineTrailingCommentAfterTrigger on Account(
+trigger InlineTrailingCommentAfterTrigger on Account (
   before insert,
   after insert /* Block Comment */
 ) {

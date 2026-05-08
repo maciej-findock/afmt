@@ -6,3 +6,4 @@ docs/src/criterion/
 tests/battle_test/repos/
 tests/battle_test/*.log
 tests/battle_test/*.cls
+.sfdx/

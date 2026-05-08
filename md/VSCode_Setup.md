@@ -1,71 +1,107 @@
-# Config afmt in VSCode
+# Setting up afmt in VSCode
 
-At the moment there is no dedicated plugin in VSCode for `afmt`, but we can
-usage the built-in `tasks` feature to invoke `afmt` from VSCode.
+Two approaches are available. The first integrates with VSCode's built-in
+**Format Document** command; the second uses VSCode **Tasks** for an explicit
+trigger.
 
-VSCode supports running tasks via `tasks.json`, which allows running shell commands on files.
+---
 
-To configure VSCode to run `afmt` against the currently opened file, follow these steps:
+## Approach 1: Format Document (recommended)
 
-## Define a Custom Task
+This approach hooks `afmt` into VSCode's standard formatter so that
+**Shift+Alt+F** (or **Format Document** from the Command Palette) formats the
+current Apex file in place.
 
-1. Open the Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac).
-1. Search for and select "Tasks: Configure Task".
-1. Choose "Create tasks.json file from template".
-1. Select "Others".
+### Prerequisites
 
-## Add the Task Configuration
+1. **Download the afmt binary** for your OS from the
+   [releases page](https://github.com/maciej-findock/afmt/releases/latest).
 
-In the tasks.json file, use this content below.
-Make sure the "command" section points to your `afmt` binary.
+2. **Make `afmt` available on your `PATH`** by creating a symlink in a
+   directory that is already on your `PATH`, for example:
+   ```bash
+   ln -s /path/to/downloaded/afmt ~/.local/bin/afmt
+   ```
+   Confirm it works:
+   ```bash
+   afmt --version
+   ```
 
-```
-{
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Run afmt on current file",
-            "type": "shell",
-            "command": "~/afmt -w ${file}", // assume afmt binary is on the ~ path
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "presentation": {
-                "echo": true,           // Echo the command
-                "reveal": "never",      // Do not show the terminal
-                "focus": false,         // Do not focus on the terminal
-                "panel": "dedicated",   // Use a dedicated terminal (optional)
-                "clear": false          // Do not clear the terminal before execution
-            },
-            "background": true,         // Marks the task as running in the background
-            "problemMatcher": [],
-            "detail": "Runs afmt against the currently opened file"
-        }
-    ]
+3. **Install the [Custom Local Formatters](https://marketplace.visualstudio.com/items?itemName=jkillian.custom-local-formatters)
+   VSCode extension.**
+
+### Configure the formatter
+
+Place an `.afmt.toml` config file in your project root (see
+[Configuration](../README.md#-configuration)), then open your VSCode
+**settings.json** (`Ctrl+Shift+P` → *Preferences: Open User Settings (JSON)*)
+and add:
+
+```json
+"customLocalFormatters.formatters": [
+  {
+    "command": "afmt -c .afmt.toml -",
+    "languages": ["apex"]
+  }
+],
+"[apex]": {
+  "editor.defaultFormatter": "jkillian.custom-local-formatters"
 }
 ```
 
-## Run the Task
+The extension runs commands from the workspace root, so `.afmt.toml` resolves
+correctly as a relative path.
 
-1. Open the Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac).
-2. Search for "Tasks: Run Task".
-3. Select "Run afmt on current file" (i.e. the name of the custom task you defined above).
-4. You should see that `afmt` formats the Apex file.
-5. If nothing happens, open a terminal and run the same to diagonize, such as run: `> ~/afmt -w path/to/valid_apex_file.cls`
+### Verify
 
-## Assign a Keybinding (Optional)
+Open any `.cls` file and press **Shift+Alt+F**. The file should be formatted
+in place.
 
-If you want to quickly trigger the task with a shortcut:
+---
 
-1. Open the Command Palette and search for "Preferences: Open Keyboard Shortcuts".
-2. Search for `workbench.action.tasks.runTask`.
-3. Add a custom keybinding in `keybindings.json`:
+## Approach 2: VSCode Task (manual trigger)
 
-```
+Use this if you prefer an explicit keybinding or do not want to install an
+additional extension.
+
+### Define a task
+
+Create or edit `.vscode/tasks.json` in your project:
+
+```json
 {
-    "key": "ctrl+alt+r", // Choose your preferred shortcut
-    "command": "workbench.action.tasks.runTask",
-    "args": "Run afmt on current file"
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Format with afmt",
+      "type": "shell",
+      "command": "afmt -w ${file}",
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+```
+
+> **Note:** Add `-c /absolute/path/to/.afmt.toml` if you use a config file.
+
+### Run the task
+
+Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and select
+**Tasks: Run Task** → **Format with afmt**.
+
+### Assign a keybinding (optional)
+
+Add to `keybindings.json` (`Ctrl+Shift+P` → *Preferences: Open Keyboard
+Shortcuts (JSON)*):
+
+```json
+{
+  "key": "ctrl+alt+f",
+  "command": "workbench.action.tasks.runTask",
+  "args": "Format with afmt"
 }
 ```

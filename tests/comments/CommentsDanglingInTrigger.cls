@@ -1,4 +1,4 @@
-trigger myAccountTrigger on Account(before delete) {
+trigger myAccountTrigger on Account (before delete) {
   // Inline Comment
 
   /* Block Comment */
