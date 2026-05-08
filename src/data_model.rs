@@ -1109,6 +1109,10 @@ pub struct ArgumentList {
     args_are_multiline: bool,
     close_paren_hugging: bool,
     same_line_nesting_depth: u32,
+    // true when the sole arg is a chained method call (method_invocation whose object is also
+    // a method_invocation). Used to suppress surround()'s extra indent so only the chain's own
+    // group_indent_concat contributes, giving consistent +4 at each level.
+    single_arg_is_chain: bool,
 }
 
 impl ArgumentList {
@@ -1149,6 +1153,12 @@ impl ArgumentList {
             }
             depth
         };
+        let single_arg_is_chain = children.len() == 1
+            && children[0].kind() == "method_invocation"
+            && children[0]
+                .child_by_field_name("object")
+                .map(|obj| obj.kind() == "method_invocation")
+                .unwrap_or(false);
 
         Self {
             expressions,
@@ -1157,6 +1167,7 @@ impl ArgumentList {
             args_are_multiline,
             close_paren_hugging,
             same_line_nesting_depth,
+            single_arg_is_chain,
         }
     }
 }
@@ -1189,6 +1200,22 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 return;
             }
 
+            // preserve_newlines: arg starts inline with `(` but content spans rows
+            // (e.g. a chained method call like `.add(chain.query().build())`).
+            // surround() always wraps content in indent(), which would stack with
+            // the inner chain's own group_indent_concat and give +8 instead of +4.
+            // Build without that extra indent so continuation lines sit at +4 from
+            // the outer chain level, consistent with the first-level .add() indent.
+            // Only applies when the sole arg IS a chained call (method_invocation whose
+            // object is also a method_invocation); plain calls like c.d(e.f(args)) or
+            // map literals need surround()'s indent for their own contents.
+            if b.preserve_newlines() && !self.is_multiline && self.close_paren_hugging && self.single_arg_is_chain {
+                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                let inner = b.intersperse(&docs, sep);
+                result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));
+                return;
+            }
+
             // When args are on the same row in source, keep them inline with a space.
             let sep_suf = if b.preserve_newlines() && self.is_multiline && !self.args_are_multiline {
                 b.txt(" ")
@@ -1196,10 +1223,7 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 b.softline()
             };
             let sep = Insertable::new::<&str>(None, None, Some(sep_suf));
-            // When preserve_newlines is on and the first arg was on the same row as `(`
-            // (detected by !is_multiline) but the arg content spans rows (close_paren_hugging),
-            // don't add a line-break before the first arg.
-            let open_suf = if b.preserve_newlines() && !self.is_multiline && self.close_paren_hugging {
+            let open_suf = if b.preserve_newlines() && self.close_paren_hugging {
                 None
             } else {
                 Some(b.maybeline())
