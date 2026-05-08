@@ -213,7 +213,8 @@ impl<'a> DocBuild<'a> for FormalParameters {
             let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
             let open = Insertable::new(None, Some("("), Some(b.maybeline()));
             let close = Insertable::new(Some(b.maybeline()), Some(")"), None);
-            let doc = b.group_surround_preserve(&parameters_doc, sep, open, close, self.is_multiline);
+            let doc =
+                b.group_surround_preserve(&parameters_doc, sep, open, close, self.is_multiline);
             result.push(doc);
         });
     }
@@ -553,10 +554,7 @@ impl ArrayInitializer {
             .windows(2)
             .map(|w| w[0].end_position().row < w[1].start_position().row)
             .collect();
-        let grandparent_kind = node
-            .parent()
-            .and_then(|p| p.parent())
-            .map(|gp| gp.kind());
+        let grandparent_kind = node.parent().and_then(|p| p.parent()).map(|gp| gp.kind());
         // array_initializer -> array_creation_expression -> argument_list?
         let is_inside_argument_list = grandparent_kind
             .as_deref()
@@ -1118,16 +1116,13 @@ pub struct ArgumentList {
 impl ArgumentList {
     pub fn new(node: Node) -> Self {
         let children = node.children_vec();
-        let expressions = children
-            .iter()
-            .map(|n| Expression::new(*n))
-            .collect();
+        let expressions = children.iter().map(|n| Expression::new(*n)).collect();
 
         // is_multiline: true when first arg is below `(`, OR any two consecutive args are on
         // separate rows. An arg whose internal content spans rows does not count by itself.
-        let args_are_multiline = children.windows(2).any(|w| {
-            w[0].end_position().row < w[1].start_position().row
-        });
+        let args_are_multiline = children
+            .windows(2)
+            .any(|w| w[0].end_position().row < w[1].start_position().row);
         let is_multiline = args_are_multiline
             || children
                 .first()
@@ -1181,7 +1176,11 @@ impl<'a> DocBuild<'a> for ArgumentList {
             // Build doc without surround's extra indent so args stay at current_indent.
             // Closing `)` dedents by depth levels to reach the statement base.
             if b.preserve_newlines() && self.is_multiline && self.same_line_nesting_depth >= 2 {
-                let sep_suf = if self.args_are_multiline { b.softline() } else { b.txt(" ") };
+                let sep_suf = if self.args_are_multiline {
+                    b.softline()
+                } else {
+                    b.txt(" ")
+                };
                 let sep = Insertable::new::<&str>(None, None, Some(sep_suf));
                 let inner = b.intersperse(&docs, sep);
                 let mut close_nl = b.maybeline();
@@ -1209,7 +1208,11 @@ impl<'a> DocBuild<'a> for ArgumentList {
             // Only applies when the sole arg IS a chained call (method_invocation whose
             // object is also a method_invocation); plain calls like c.d(e.f(args)) or
             // map literals need surround()'s indent for their own contents.
-            if b.preserve_newlines() && !self.is_multiline && self.close_paren_hugging && self.single_arg_is_chain {
+            if b.preserve_newlines()
+                && !self.is_multiline
+                && self.close_paren_hugging
+                && self.single_arg_is_chain
+            {
                 let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
                 let inner = b.intersperse(&docs, sep);
                 result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));
@@ -1217,7 +1220,8 @@ impl<'a> DocBuild<'a> for ArgumentList {
             }
 
             // When args are on the same row in source, keep them inline with a space.
-            let sep_suf = if b.preserve_newlines() && self.is_multiline && !self.args_are_multiline {
+            let sep_suf = if b.preserve_newlines() && self.is_multiline && !self.args_are_multiline
+            {
                 b.txt(" ")
             } else {
                 b.softline()
@@ -1233,7 +1237,10 @@ impl<'a> DocBuild<'a> for ArgumentList {
             // depth == 1: one dedent brings `)` to statement base.
             let close_pre = if b.preserve_newlines() && self.close_paren_hugging {
                 None
-            } else if b.preserve_newlines() && self.is_multiline && self.same_line_nesting_depth == 1 {
+            } else if b.preserve_newlines()
+                && self.is_multiline
+                && self.same_line_nesting_depth == 1
+            {
                 Some(b.dedent(b.maybeline()))
             } else {
                 Some(b.maybeline())
@@ -1297,9 +1304,9 @@ pub struct BinaryExpressionContext {
     has_parent_same_precedence: bool,
     is_parent_return_statement: bool,
     is_multiline: bool,
-    break_before_op: bool,   // developer put a newline before the operator
-    break_after_op: bool,    // developer put a newline after the operator
-    chain_is_multiline: bool, // any node in the chain (including descendants) spans rows
+    break_before_op: bool,        // developer put a newline before the operator
+    break_after_op: bool,         // developer put a newline after the operator
+    chain_is_multiline: bool,     // any node in the chain (including descendants) spans rows
     is_top_level_condition: bool, // direct child of an if/while/for condition parens
     is_inside_binary_paren: bool, // inside (...) that is directly inside another binary expression
 }
@@ -1383,8 +1390,16 @@ impl<'a> DocBuild<'a> for BinaryExpression {
             // With preserve_newlines, honour where the developer placed the line break:
             // before the operator (`\n&&`) or after it (`&&\n`).
             let (pre_op, post_op) = if b.preserve_newlines() && context.is_multiline {
-                let pre = if context.break_before_op { b.nl() } else { b.txt(" ") };
-                let post = if context.break_after_op { b.nl() } else { b.txt(" ") };
+                let pre = if context.break_before_op {
+                    b.nl()
+                } else {
+                    b.txt(" ")
+                };
+                let post = if context.break_after_op {
+                    b.nl()
+                } else {
+                    b.txt(" ")
+                };
                 (pre, post)
             } else {
                 (b.softline(), b.txt(" "))
@@ -1392,8 +1407,7 @@ impl<'a> DocBuild<'a> for BinaryExpression {
 
             // chaining case: delegate to the parent to handle group() or align()
             if context.has_parent_same_precedence {
-                return result
-                    .push(b.concat(vec![left_doc, pre_op, op_doc, post_op, right_doc]));
+                return result.push(b.concat(vec![left_doc, pre_op, op_doc, post_op, right_doc]));
             }
 
             let inner = b.concat(vec![left_doc, pre_op, op_doc, post_op, right_doc]);
@@ -5170,10 +5184,7 @@ impl<'a> DocBuild<'a> for WhereClause {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             if b.preserve_newlines() && self.is_multiline {
-                let docs = vec![
-                    b.txt("WHERE "),
-                    self.boolean_exp.build_with_parent(b, None),
-                ];
+                let docs = vec![b.txt("WHERE "), self.boolean_exp.build_with_parent(b, None)];
                 result.push(b.concat(docs));
             } else {
                 let docs = vec![
@@ -5446,10 +5457,7 @@ impl MapInitializer {
             .first()
             .map(|n| n.start_position().row != node.start_position().row)
             .unwrap_or(false);
-        let grandparent_kind = node
-            .parent()
-            .and_then(|p| p.parent())
-            .map(|gp| gp.kind());
+        let grandparent_kind = node.parent().and_then(|p| p.parent()).map(|gp| gp.kind());
         // map_initializer -> map_creation_expression -> parenthesized_expression?
         let is_inside_parens = grandparent_kind
             .as_deref()
@@ -5478,10 +5486,10 @@ impl MapInitializer {
             let map_row = node.start_position().row;
             let mut depth = 0u32;
             let mut cur = node
-                .parent()                    // map_creation_expression
-                .and_then(|p| p.parent())    // direct argument_list
-                .and_then(|p| p.parent())    // method_invocation
-                .and_then(|p| p.parent());   // possibly outer argument_list
+                .parent() // map_creation_expression
+                .and_then(|p| p.parent()) // direct argument_list
+                .and_then(|p| p.parent()) // method_invocation
+                .and_then(|p| p.parent()); // possibly outer argument_list
             while let Some(anc) = cur {
                 if anc.kind() == "argument_list" && anc.start_position().row == map_row {
                     depth += 1;
@@ -5519,8 +5527,8 @@ impl<'a> DocBuild<'a> for MapInitializer {
                 let inner = b.concat(vec![
                     b.txt("{"),
                     b.indent(b.indent(b.softline())), // newline at L+8
-                    b.indent(b.indent(entries)),       // entries at L+8
-                    b.softline(),                      // newline at L (no indent)
+                    b.indent(b.indent(entries)),      // entries at L+8
+                    b.softline(),                     // newline at L (no indent)
                     b.txt("}"),
                 ]);
                 result.push(b.group(b.concat(vec![b.force_break(), inner])));

@@ -833,9 +833,8 @@ impl<M> BodyMember<M> {
             }
             earliest
         };
-        node.parent().is_some_and(|parent| {
-            first_content_row > parent.start_position().row + 1
-        })
+        node.parent()
+            .is_some_and(|parent| first_content_row > parent.start_position().row + 1)
     }
 
     // take comment nodes into consideration

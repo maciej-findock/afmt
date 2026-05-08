@@ -150,7 +150,11 @@ impl Comment {
         self.is_printed.get()
     }
 
-    fn build_javadoc<'a>(b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>, mut lines: Vec<&str>) {
+    fn build_javadoc<'a>(
+        b: &'a DocBuilder<'a>,
+        result: &mut Vec<DocRef<'a>>,
+        mut lines: Vec<&str>,
+    ) {
         // Normalize inline /** content */ to multi-line
         if !lines.is_empty() {
             let first = lines[0].trim();
