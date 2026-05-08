@@ -557,7 +557,6 @@ impl ArrayInitializer {
         let grandparent_kind = node.parent().and_then(|p| p.parent()).map(|gp| gp.kind());
         // array_initializer -> array_creation_expression -> argument_list?
         let is_inside_argument_list = grandparent_kind
-            .as_deref()
             .map(|k| k == "argument_list")
             .unwrap_or(false);
 
@@ -5460,12 +5459,10 @@ impl MapInitializer {
         let grandparent_kind = node.parent().and_then(|p| p.parent()).map(|gp| gp.kind());
         // map_initializer -> map_creation_expression -> parenthesized_expression?
         let is_inside_parens = grandparent_kind
-            .as_deref()
             .map(|k| k == "parenthesized_expression")
             .unwrap_or(false);
         // map_initializer -> map_creation_expression -> argument_list?
         let is_inside_argument_list = grandparent_kind
-            .as_deref()
             .map(|k| k == "argument_list")
             .unwrap_or(false);
         // true when the map_creation_expression starts on the same row as its
