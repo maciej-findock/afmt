@@ -1110,6 +1110,9 @@ pub struct ArgumentList {
     // a method_invocation). Used to suppress surround()'s extra indent so only the chain's own
     // group_indent_concat contributes, giving consistent +4 at each level.
     single_arg_is_chain: bool,
+    // true when single_arg_is_chain AND the chain node itself spans multiple rows in source.
+    // Used to decide whether to bypass surround() for expanded multiline chains.
+    single_chain_is_multiline: bool,
 }
 
 impl ArgumentList {
@@ -1152,10 +1155,11 @@ impl ArgumentList {
             && children[0]
                 .child_by_field_name("object")
                 .map(|obj| {
-                    obj.kind() == "method_invocation"
-                        || obj.kind() == "object_creation_expression"
+                    obj.kind() == "method_invocation" || obj.kind() == "object_creation_expression"
                 })
                 .unwrap_or(false);
+        let single_chain_is_multiline = single_arg_is_chain
+            && children[0].start_position().row != children[0].end_position().row;
 
         Self {
             expressions,
@@ -1165,6 +1169,7 @@ impl ArgumentList {
             close_paren_hugging,
             same_line_nesting_depth,
             single_arg_is_chain,
+            single_chain_is_multiline,
         }
     }
 }
@@ -1203,12 +1208,17 @@ impl<'a> DocBuild<'a> for ArgumentList {
 
             // preserve_newlines: sole arg is a method chain (new Foo().m1().m2() or
             // obj.m1().m2()). surround() would stack its indent() with the chain's own
-            // group_indent_concat giving +8 instead of +4, and the layout (inline vs
-            // expanded) would produce inconsistent indentation. Always normalise to the
-            // close-paren-hugging form: (chain…last()) with no extra indent so chain
-            // continuation lines sit at +4 from the outer call, regardless of whether
-            // the source had `(new Foo()` inline or `(\n    new Foo()` expanded.
-            if b.preserve_newlines() && self.single_arg_is_chain {
+            // group_indent_concat giving +8 instead of +4.
+            // Bypass when:
+            //   - chain is inline in source (!is_multiline): normalise to close-paren-hugging form
+            //   - chain itself spans multiple rows (single_chain_is_multiline): normalise expanded
+            //     multiline chain to close-paren-hugging form
+            // Don't bypass when is_multiline but the chain is a single row — the developer
+            // intentionally expanded the arg list, so preserve that with force_break surround.
+            if b.preserve_newlines()
+                && self.single_arg_is_chain
+                && (!self.is_multiline || self.single_chain_is_multiline)
+            {
                 let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
                 let inner = b.intersperse(&docs, sep);
                 result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));

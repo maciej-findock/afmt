@@ -809,7 +809,25 @@ impl<M> BodyMember<M> {
             has_trailing_newline: Self::has_trailing_newline(node),
             has_leading_newline: Self::has_leading_newline(node),
             node_id: node.id(),
-            is_multiline: node.start_position().row != node.end_position().row,
+            // A node is multiline if it spans multiple source rows OR if it is a
+            // block-level kind that the formatter always expands to multiple lines
+            // (e.g. `class Foo {}` becomes `class Foo {\n}`). Using only the source
+            // row check causes a two-pass non-idempotency: single-line `{ }` bodies
+            // are expanded by the formatter, and only the second pass sees them as
+            // multiline and adds the required blank line before the next member.
+            // method_declaration is only always-multiline when it has a body; abstract
+            // methods (`public abstract void foo();`) stay on one line.
+            is_multiline: node.start_position().row != node.end_position().row
+                || matches!(
+                    node.kind(),
+                    "class_declaration"
+                        | "constructor_declaration"
+                        | "interface_declaration"
+                        | "enum_declaration"
+                        | "static_initializer"
+                        | "block"
+                )
+                || (node.kind() == "method_declaration" && node.try_c_by_n("body").is_some()),
         }
     }
 

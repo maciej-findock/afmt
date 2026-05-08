@@ -16,6 +16,7 @@ class SharingClass {
 
   without sharing class WithoutSharingClass {
   }
+
   with sharing class WithSharingClass {
   }
 

@@ -41,6 +41,7 @@ class EmptyLine {
 
     i--;
   }
+
   void blockStatementWithoutEmptyLine() {
   }
 
