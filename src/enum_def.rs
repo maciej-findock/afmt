@@ -812,11 +812,27 @@ impl<M> BodyMember<M> {
     }
 
     fn has_leading_newline(node: &Node) -> bool {
-        if node.prev_named_sibling().is_some() {
+        // A real (non-comment) prev sibling means this is not the first member.
+        if node.prev_named_sibling().is_some_and(|s| !s.is_extra()) {
             return false;
         }
+        // Walk back through preceding extra (comment) siblings to find the
+        // earliest first-content row. If comments precede this node, the blank
+        // line check must use the first comment's row, not the node's own row.
+        let first_content_row = {
+            let mut earliest = node.start_position().row;
+            let mut cur = node.prev_named_sibling();
+            while let Some(prev) = cur {
+                if !prev.is_extra() {
+                    break;
+                }
+                earliest = prev.start_position().row;
+                cur = prev.prev_named_sibling();
+            }
+            earliest
+        };
         node.parent().is_some_and(|parent| {
-            node.start_position().row > parent.start_position().row + 1
+            first_content_row > parent.start_position().row + 1
         })
     }
 

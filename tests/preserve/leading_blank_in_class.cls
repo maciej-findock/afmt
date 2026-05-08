@@ -5,3 +5,13 @@ global with sharing class ActionClass {
         return null;
     }
 }
+
+public with sharing class Scheduled implements Schedulable {
+
+    /**
+     * Entry point called by the scheduler.
+     */
+    public void execute(SchedulableContext ctx) {
+        doWork();
+    }
+}
