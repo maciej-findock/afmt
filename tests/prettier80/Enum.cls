@@ -5,6 +5,7 @@ class EnumTest {
     SUMMER,
     FALL
   }
+
   enum Month {
     JANUARY,
     FEBRUARY,

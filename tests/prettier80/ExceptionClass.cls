@@ -48,6 +48,7 @@ class ExceptionClass {
 
   class CustomException extends Exception {
   }
+
   class AnotherCustomException extends Exception {
   }
 }
