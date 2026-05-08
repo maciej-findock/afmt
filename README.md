@@ -166,6 +166,12 @@ indent_size = 4
 # initializer that was written multiline in the source stays multiline in the
 # output. Only horizontal formatting (spacing, indentation) is corrected.
 preserve_newlines = false
+
+# Normalise JavaDoc comments (/** ... */) to standard alignment.
+# When false (default), block comment content is preserved verbatim.
+# When true, each line is trimmed and prefixed with " * ", the opening
+# /** is placed on its own line, and the closing */ is normalised to " */".
+format_doc_comments = false
 ```
 
 ### `preserve_newlines`
@@ -193,8 +199,35 @@ result = someMethod(
 );
 ```
 
-Affected constructs: argument lists, parameter lists, array initializers, and
-map initializers.
+Affected constructs: argument lists, parameter lists, array/set/map
+initializers, method chains, binary expressions, and `implements` clauses.
+
+### `format_doc_comments`
+
+By default block comment content (including JavaDoc `/**`) is preserved
+verbatim — only its position in the file is adjusted. With
+`format_doc_comments = true` the formatter normalises JavaDoc comments to
+standard alignment:
+
+```apex
+// source — non-standard indentation
+/**
+* @description Does something.
+* @param x The value.
+*/
+
+// format_doc_comments = false (default) → preserved as-is
+/**
+* @description Does something.
+* @param x The value.
+*/
+
+// format_doc_comments = true → normalised
+/**
+ * @description Does something.
+ * @param x The value.
+ */
+```
 
 <br>
 
