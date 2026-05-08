@@ -1201,20 +1201,14 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 return;
             }
 
-            // preserve_newlines: arg starts inline with `(` but content spans rows
-            // (e.g. a chained method call like `.add(chain.query().build())`).
-            // surround() always wraps content in indent(), which would stack with
-            // the inner chain's own group_indent_concat and give +8 instead of +4.
-            // Build without that extra indent so continuation lines sit at +4 from
-            // the outer chain level, consistent with the first-level .add() indent.
-            // Only applies when the sole arg IS a chained call (method_invocation whose
-            // object is also a method_invocation); plain calls like c.d(e.f(args)) or
-            // map literals need surround()'s indent for their own contents.
-            if b.preserve_newlines()
-                && !self.is_multiline
-                && self.close_paren_hugging
-                && self.single_arg_is_chain
-            {
+            // preserve_newlines: sole arg is a method chain (new Foo().m1().m2() or
+            // obj.m1().m2()). surround() would stack its indent() with the chain's own
+            // group_indent_concat giving +8 instead of +4, and the layout (inline vs
+            // expanded) would produce inconsistent indentation. Always normalise to the
+            // close-paren-hugging form: (chain…last()) with no extra indent so chain
+            // continuation lines sit at +4 from the outer call, regardless of whether
+            // the source had `(new Foo()` inline or `(\n    new Foo()` expanded.
+            if b.preserve_newlines() && self.single_arg_is_chain {
                 let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
                 let inner = b.intersperse(&docs, sep);
                 result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));
