@@ -141,6 +141,55 @@ impl Comment {
     pub fn is_printed(&self) -> bool {
         self.is_printed.get()
     }
+
+    fn build_javadoc<'a>(b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>, mut lines: Vec<&str>) {
+        // Normalize inline /** content */ to multi-line
+        if !lines.is_empty() {
+            let first = lines[0].trim();
+            if first.len() > 3 {
+                let content = first[3..].trim();
+                if !content.is_empty() {
+                    lines[0] = "/**";
+                    lines.insert(1, content);
+                }
+            }
+        }
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if i == 0 {
+                result.push(b.txt(trimmed));
+            } else if i == lines.len() - 1 {
+                if let Some(before_end) = trimmed.strip_suffix("*/") {
+                    let content = before_end.trim();
+                    if content.is_empty() {
+                        result.push(b.txt(" */"));
+                    } else {
+                        result.push(b.txt(format!(" * {}", content)));
+                        result.push(b.nl());
+                        result.push(b.txt(" */"));
+                    }
+                } else {
+                    result.push(b.txt(" */"));
+                }
+            } else if trimmed.is_empty() {
+                result.push(b.txt(" *"));
+            } else if let Some(after_star) = trimmed.strip_prefix('*') {
+                let content = after_star.trim_start();
+                if content.is_empty() {
+                    result.push(b.txt(" *"));
+                } else {
+                    result.push(b.txt(format!(" * {}", content)));
+                }
+            } else {
+                result.push(b.txt(format!(" * {}", trimmed)));
+            }
+
+            if i < lines.len() - 1 {
+                result.push(b.nl());
+            }
+        }
+    }
 }
 
 impl<'a> DocBuild<'a> for Comment {
@@ -152,12 +201,16 @@ impl<'a> DocBuild<'a> for Comment {
             }
             CommentType::Block => {
                 let lines: Vec<&str> = self.value.split('\n').collect();
-                // Preserve block comment content verbatim (including JavaDoc /**).
-                // nl_with_no_indent keeps internal lines at their original column.
-                for (i, line) in lines.iter().enumerate() {
-                    result.push(b.txt(*line));
-                    if i < lines.len() - 1 {
-                        result.push(b.nl_with_no_indent());
+                if b.format_doc_comments() && self.value.starts_with("/**") {
+                    Self::build_javadoc(b, result, lines);
+                } else {
+                    // Preserve verbatim; nl_with_no_indent keeps internal lines
+                    // at their original column without adding current indent.
+                    for (i, line) in lines.iter().enumerate() {
+                        result.push(b.txt(*line));
+                        if i < lines.len() - 1 {
+                            result.push(b.nl_with_no_indent());
+                        }
                     }
                 }
             }

@@ -205,6 +205,10 @@ impl<'a> DocBuilder<'a> {
         self.config.preserve_newlines
     }
 
+    pub fn format_doc_comments(&self) -> bool {
+        self.config.format_doc_comments
+    }
+
     pub fn group_concat(&'a self, doc_refs: impl IntoIterator<Item = DocRef<'a>>) -> DocRef<'a> {
         self.group(self.concat(doc_refs))
     }
