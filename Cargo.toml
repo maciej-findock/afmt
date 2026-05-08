@@ -2,7 +2,7 @@
 name = "sf-afmt"
 version = "0.13.0"
 edition = "2021"
-description = "An Salesforce Apex lang formatter"
+description = "Salesforce Apex formatter — FinDock edition"
 license = "MIT OR Apache-2.0"
 
 [[bin]]
