@@ -229,6 +229,24 @@ standard alignment:
  */
 ```
 
+### `// afmt:ignore`
+
+Place `// afmt:ignore` on the line immediately before any statement or
+declaration to preserve that node's original source text exactly as written,
+skipping all formatting for it:
+
+```apex
+// afmt:ignore
+List<Map<String, String>> defs = new List<Map<String, String>> {
+        'key' => builder.listOfRules()
+                    .add(builder.rule('A').query(SObjectA.Id).build())
+                    .add(builder.rule('B').query(SObjectB.Id).build())
+};
+```
+
+afmt will format the surrounding code normally but leave the ignored node
+untouched. The `// afmt:ignore` comment itself is preserved in the output.
+
 <br>
 
 ## ❓ FAQ
