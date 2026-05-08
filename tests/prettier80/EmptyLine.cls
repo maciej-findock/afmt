@@ -5,6 +5,7 @@ class EmptyLine {
 
   enum NUMBER {
   }
+
   void blockStatement() {
   }
 
@@ -42,6 +43,7 @@ class EmptyLine {
   }
   void blockStatementWithoutEmptyLine() {
   }
+
   void dmlInsert() {
     insert a;
 

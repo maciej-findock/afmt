@@ -183,6 +183,78 @@ impl<'a> DocBuilder<'a> {
         self.concat(member_docs)
     }
 
+    pub fn surround_class_body_members<M>(
+        &'a self,
+        elems: &[BodyMember<M>],
+        open: &str,
+        close: &str,
+    ) -> DocRef<'a>
+    where
+        M: DocBuild<'a>,
+    {
+        if elems.is_empty() {
+            return self.concat(vec![self.txt(open), self.nl(), self.txt(close)]);
+        }
+
+        let open_line_comment = if self.preserve_newlines() {
+            elems.first().and_then(|first| {
+                let bucket = get_comment_bucket(&first.node_id);
+                bucket.pre_comments.first().filter(|c| c.is_on_parent_open_line()).map(|c| {
+                    c.mark_as_printed();
+                    self.concat(vec![self.txt(" "), self.txt(&c.value)])
+                })
+            })
+        } else {
+            None
+        };
+
+        let leading = if self.preserve_newlines()
+            && elems.first().is_some_and(|m| m.has_leading_newline)
+        {
+            self.indent(self.empty_new_line())
+        } else {
+            self.indent(self.nl())
+        };
+
+        let mut parts = vec![self.txt(open)];
+        if let Some(c) = open_line_comment {
+            parts.push(c);
+        }
+        parts.push(leading);
+        parts.push(self.indent(self.intersperse_class_members(elems)));
+        parts.push(self.nl());
+        parts.push(self.txt(close));
+        self.concat(parts)
+    }
+
+    // Class-body variant: enforces a blank line before any member that spans
+    // multiple source rows (methods, multi-line properties, inner classes).
+    // Single-row members (fields, one-line `{ get; set; }` properties) are
+    // separated by a plain newline and can be grouped without blank lines.
+    pub fn intersperse_class_members<'b, M>(&'a self, members: &[BodyMember<M>]) -> DocRef<'a>
+    where
+        M: DocBuild<'a>,
+    {
+        if members.is_empty() {
+            return self.nil();
+        }
+
+        let mut member_docs = Vec::new();
+        for (i, m) in members.iter().enumerate() {
+            member_docs.push(m.member.build(self));
+
+            if i < members.len() - 1 {
+                let next_is_multiline = members[i + 1].is_multiline;
+                if next_is_multiline || m.has_trailing_newline {
+                    member_docs.push(self.empty_new_line());
+                } else {
+                    member_docs.push(self.nl());
+                }
+            }
+        }
+        self.concat(member_docs)
+    }
+
     pub fn to_docs<'b, T>(&'a self, items: impl IntoIterator<Item = &'b T>) -> Vec<DocRef<'a>>
     where
         T: DocBuild<'a> + 'b,

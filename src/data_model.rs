@@ -452,7 +452,7 @@ impl<'a> DocBuild<'a> for ClassBody {
         handle_pre_comments(b, bucket, result);
 
         if bucket.dangling_comments.is_empty() {
-            result.push(b.surround_body_members(&self.class_members, "{", "}"));
+            result.push(b.surround_class_body_members(&self.class_members, "{", "}"));
             handle_post_comments(b, bucket, result);
         } else {
             handle_dangling_comments_in_bracket_surround(b, bucket, result);

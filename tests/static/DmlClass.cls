@@ -16,6 +16,7 @@ class DMLClass {
     insert as user account;
     insert as system account;
   }
+
   void updateTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
     Account account = new Account(Id = accountId, Name = 'Acme');
@@ -34,6 +35,7 @@ class DMLClass {
     update as user account;
     update as system account;
   }
+
   void upsertWithoutOptFieldTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
     Account account = new Account(Id = accountId, Name = 'Acme');
@@ -52,6 +54,7 @@ class DMLClass {
     upsert as user account;
     upsert as system account;
   }
+
   void upsertWithOptFieldTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
     Account account =
@@ -75,6 +78,7 @@ class DMLClass {
       }
       Account.Fields.External_Id__c;
   }
+
   void deleteTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
     Account account = new Account(Id = accountId, Name = 'Acme');
@@ -93,6 +97,7 @@ class DMLClass {
     delete as user account;
     delete as system account;
   }
+
   void undeleteTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1 ALL ROWS].Id;
     Id[] accountIds = new List<Id> {accountId};
@@ -114,6 +119,7 @@ class DMLClass {
     undelete as user account;
     undelete as system account;
   }
+
   void mergeTest() {
     Id accountId = [SELECT Id FROM Account LIMIT 1].Id;
     Id[] accountIds = new List<Id> {accountId};

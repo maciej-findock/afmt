@@ -799,6 +799,7 @@ pub struct BodyMember<M> {
     pub has_trailing_newline: bool, // already take comment nodes into consideration
     pub has_leading_newline: bool,  // blank line between opening brace and first member
     pub node_id: usize,
+    pub is_multiline: bool, // node spans more than one source row
 }
 
 impl<M> BodyMember<M> {
@@ -808,6 +809,7 @@ impl<M> BodyMember<M> {
             has_trailing_newline: Self::has_trailing_newline(node),
             has_leading_newline: Self::has_leading_newline(node),
             node_id: node.id(),
+            is_multiline: node.start_position().row != node.end_position().row,
         }
     }
 

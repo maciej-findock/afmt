@@ -4,18 +4,22 @@ class Literal {
     return null;
     return null;
   }
+
   void stringLiteral() {
     return 'a';
     return '"non-escaped quotes"';
   }
+
   void integerLiteral() {
     return 1;
   }
+
   void longLiteral() {
     return 2147483648L;
     return 2147483640L;
     return 2312321321L;
   }
+
   void decimalLiteral() {
     return 1.01d;
     return 1.0d;
@@ -23,22 +27,26 @@ class Literal {
     return 1.30d;
     return 1.30d;
   }
+
   void doubleLiteral() {
     return 1.1;
     return 1.0;
     return 1.00;
     return 1.30;
   }
+
   void trueLiteral() {
     return true;
     return true;
     return true;
   }
+
   void falseLiteral() {
     return false;
     return false;
     return false;
   }
+
   void queryEscapedString() {
     return [SELECT Name FROM Account WHERE Name LIKE '\_'];
     return [SELECT Name FROM Account WHERE Name LIKE '\%'];

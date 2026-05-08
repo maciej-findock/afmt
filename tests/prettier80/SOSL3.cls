@@ -20,6 +20,7 @@ class SOSLClass {
     searchResult = [FIND 'Hello' IN PHONE FIELDS];
     searchResult = [FIND 'Hello' IN SIDEBAR FIELDS];
   }
+
   void withDivisionClause() {
     List<List<SObject>> searchResult;
     String a = 'Local';
@@ -27,6 +28,7 @@ class SOSLClass {
     searchResult = [FIND 'Hello' WITH DIVISION = :a];
     searchResult = [FIND 'foobar' RETURNING Account WITH DIVISION = 'global'];
   }
+
   void withDataCategory() {
     List<List<SObject>> searchResult;
     String a = 'Local';
@@ -42,12 +44,14 @@ class SOSLClass {
       WITH DATA CATEGORY Geography__c BELOW Europe__c
     ];
   }
+
   void withSnippet() {
     List<List<SObject>> searchResult;
     String a = 'Local';
     searchResult = [FIND 'Hello' WITH SNIPPET];
     searchResult = [FIND 'Hello' WITH SNIPPET(TARGET_LENGTH = 120)];
   }
+
   void withNetwork() {
     List<List<SObject>> searchResult;
     searchResult = [FIND 'Hello' WITH NETWORK = 'NetworkId'];
@@ -68,6 +72,7 @@ class SOSLClass {
       )
     ];
   }
+
   void withPricebookId() {
     List<List<SObject>> searchResult;
     searchResult = [FIND 'Hello' WITH PriceBookId = '01sxx0000002MffAAE'];
@@ -78,19 +83,23 @@ class SOSLClass {
       WITH PriceBookId = '01sxx0000002MffAAE'
     ];
   }
+
   void withMetadata() {
     List<List<SObject>> searchResult;
     searchResult = [FIND 'Hello' WITH METADATA = 'LABELS'];
   }
+
   void withHighlight() {
     List<List<SObject>> searchResult;
     searchResult = [FIND 'Hello' WITH HIGHLIGHT];
   }
+
   void withSpellCorrection() {
     List<List<SObject>> searchResult;
     searchResult = [FIND 'Hello' WITH SPELL_CORRECTION = true];
     searchResult = [FIND 'Hello' WITH SPELL_CORRECTION = false];
   }
+
   void returning() {
     List<List<SObject>> searchResult;
     String a = 'World';
@@ -143,6 +152,7 @@ class SOSLClass {
             DISTANCE(My_Location_Field__c, GEOLOCATION(37, 122), 'mi') < 100)
     ];
   }
+
   void updateStat() {
     List<List<String>> searchResult;
     searchResult = [
