@@ -3103,6 +3103,7 @@ pub struct TernaryExpression {
     pub condition: Expression,
     pub consequence: Expression,
     pub alternative: Expression,
+    pub is_multiline: bool,
     pub node_context: NodeContext,
 }
 
@@ -3110,10 +3111,16 @@ impl TernaryExpression {
     pub fn new(node: Node) -> Self {
         assert_check(node, "ternary_expression");
 
+        let condition_node = node.c_by_n("condition");
+        let consequence_node = node.c_by_n("consequence");
+        let is_multiline =
+            condition_node.end_position().row != consequence_node.start_position().row;
+
         Self {
-            condition: Expression::new(node.c_by_n("condition")),
-            consequence: Expression::new(node.c_by_n("consequence")),
+            condition: Expression::new(condition_node),
+            consequence: Expression::new(consequence_node),
             alternative: Expression::new(node.c_by_n("alternative")),
+            is_multiline,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -3122,16 +3129,29 @@ impl TernaryExpression {
 impl<'a> DocBuild<'a> for TernaryExpression {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            let docs = vec![
-                self.condition.build(b),
-                b.softline(),
-                b.txt_("?"),
-                self.consequence.build(b),
-                b.softline(),
-                b.txt_(":"),
-                self.alternative.build(b),
-            ];
-            result.push(b.group_concat(docs));
+            if b.preserve_newlines() && self.is_multiline {
+                let docs = vec![
+                    self.condition.build(b),
+                    b.indent(b.indent(b.nl())),
+                    b.txt_("?"),
+                    self.consequence.build(b),
+                    b.indent(b.indent(b.nl())),
+                    b.txt_(":"),
+                    self.alternative.build(b),
+                ];
+                result.push(b.concat(docs));
+            } else {
+                let docs = vec![
+                    self.condition.build(b),
+                    b.softline(),
+                    b.txt_("?"),
+                    self.consequence.build(b),
+                    b.softline(),
+                    b.txt_(":"),
+                    self.alternative.build(b),
+                ];
+                result.push(b.group_concat(docs));
+            }
         });
     }
 }
