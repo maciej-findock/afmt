@@ -32,19 +32,6 @@
 
 <br>
 
-## 🌐 Playground
-
-Try the browser version [playground](https://xixiaofinland.github.io/afmt-web-service/), and its source code [here](https://github.com/xixiaofinland/afmt-web-service).
-
-## ⭐ Features
-
-- **Performant**
-- **Configurable:** via `.afmt.toml`.
-- **Standalone:** CLI with no dependencies.
-- **Open Source**
-
-<br>
-
 ## ✨ vs. Prettier Apex
 
 While both `afmt` and Prettier Apex aim to format Salesforce Apex code, they differ fundamentally in their design philosophies:
@@ -65,55 +52,35 @@ This means `afmt` will progressively introduce more configuration options, addre
 | **Open Source**  | Yes                       | Yes                         |
 <br>
 
-## 📥 Installation
+## Installation
 
-### 1. Script Install
-
-#### For Linux/MacOS
+Install Rust/Cargo first:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/xixiaofinland/afmt/main/scripts/install-afmt.sh | bash
+curl https://sh.rustup.rs -sSf | sh
+source "$HOME/.cargo/env"
 ```
 
-#### For Windows (PowerShell)
-
-```ps1
-iwr -useb https://raw.githubusercontent.com/xixiaofinland/afmt/main/scripts/install-afmt.ps1 | iex
-```
-
-> [!NOTE]
-> If you see an error like "This script contains malicious content and has been
-> blocked by your antivirus software", it means Microsoft Defender flagged it
-> for downloading and executing content from the internet. To proceed, either
-> lower Defender’s protection or break the script into smaller steps:
-
-```ps1
-# Step 1: Review the script manually
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/xixiaofinland/afmt/main/scripts/install-afmt.ps1 -OutFile install-afmt.ps1
-notepad install-afmt.ps1  # Inspect the content
-
-# Step 2: Run after trust
-powershell -ExecutionPolicy Bypass -File install-afmt.ps1
-```
-
-<br>
-
-### 2. Cargo Install
-
-`afmt` is published in creates.io [here](https://crates.io/crates/sf-afmt).
-Run cmd below if you have the `Cargo` tool.
+Then install the latest version of `afmt`:
 
 ```bash
-cargo install sf-afmt
+cargo install --git https://github.com/maciej-findock/afmt --locked
 ```
 
-<br>
+Verify installation:
 
-### 3. Manual Download
+```bash
+afmt --version
+```
 
-Visit the [release page](https://github.com/xixiaofinland/afmt/releases/latest) and download the appropriate binary for your operating system (Linux, macOS, or Windows).
+Cargo installs binaries into:
 
-<br>
+```text
+~/.cargo/bin
+```
+
+Make sure this directory is included in your `PATH`.
+
 
 ## 💻 Usage
 
