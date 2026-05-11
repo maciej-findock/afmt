@@ -15,7 +15,7 @@ class A {
         WHERE Id = '001000001FAKEID' AND Very_Long_Field_Name__c = 'Hello'
       ];
 
-    string city =
+    String city =
       [SELECT BillingCity FROM Account WHERE Id = '001xx000000001oAAA']
         ?.BillingCity;
   }

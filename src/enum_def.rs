@@ -4,7 +4,10 @@ use crate::{
     data_model::*,
     doc::DocRef,
     doc_builder::{DocBuilder, Insertable},
-    utility::{assert_check, build_with_comments_and_punc, get_comment_bucket, panic_unknown_node},
+    utility::{
+        assert_check, build_with_comments_and_punc, get_comment_bucket, normalize_apex_type_name,
+        panic_unknown_node,
+    },
 };
 use tree_sitter::Node;
 
@@ -165,7 +168,9 @@ impl<'a> DocBuild<'a> for SimpleType {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         match self {
             Self::Identifier(n) => {
-                result.push(n.build(b));
+                build_with_comments_and_punc(b, &n.node_context, result, |b, result| {
+                    result.push(b.txt(normalize_apex_type_name(&n.value)));
+                });
             }
             Self::Java(n) => {
                 result.push(n.build(b));

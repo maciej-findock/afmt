@@ -20,6 +20,27 @@ pub fn truncate_snippet(snippet: &str) -> String {
     }
 }
 
+pub fn normalize_apex_type_name(value: &str) -> &str {
+    match value {
+        "blob" => "Blob",
+        "boolean" => "Boolean",
+        "date" => "Date",
+        "datetime" => "Datetime",
+        "decimal" => "Decimal",
+        "double" => "Double",
+        "id" => "Id",
+        "integer" => "Integer",
+        "list" => "List",
+        "long" => "Long",
+        "map" => "Map",
+        "object" => "Object",
+        "set" => "Set",
+        "string" => "String",
+        "time" => "Time",
+        _ => value,
+    }
+}
+
 thread_local! {
     static THREAD_SOURCE_CODE: Cell<Option<&'static str>>
         = const{ Cell::new(None) };

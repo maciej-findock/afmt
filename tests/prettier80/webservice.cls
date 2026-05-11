@@ -1,4 +1,4 @@
 class A {
-  webService static decimal c() {
+  webService static Decimal c() {
   }
 }

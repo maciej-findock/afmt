@@ -757,7 +757,7 @@ impl BoolType {
 impl<'a> DocBuild<'a> for BoolType {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt("boolean"));
+            result.push(b.txt(normalize_apex_type_name("boolean")));
         });
     }
 }
@@ -1689,7 +1689,7 @@ impl<'a> DocBuild<'a> for GenericIdentifier {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         match self {
             Self::Type(s) => {
-                result.push(b.txt(s));
+                result.push(b.txt(normalize_apex_type_name(s)));
             }
             Self::Scoped(s) => {
                 result.push(s.build(b));
@@ -2111,7 +2111,7 @@ impl<'a> DocBuild<'a> for ScopedTypeIdentifier {
                 result.push(b.intersperse(&docs, sep));
                 result.push(b.txt(" "));
             }
-            result.push(b.txt(&self.type_identifier));
+            result.push(b.txt(normalize_apex_type_name(&self.type_identifier)));
         });
     }
 }
@@ -2387,7 +2387,7 @@ impl<'a> DocBuild<'a> for TypeParameter {
                 result.push(b.intersperse(&docs, sep));
                 result.push(b.txt(" "));
             }
-            result.push(b.txt(&self.type_identifier));
+            result.push(b.txt(normalize_apex_type_name(&self.type_identifier)));
         });
     }
 }
