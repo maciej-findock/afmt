@@ -183,24 +183,32 @@ pub struct FormalParameters {
     pub formal_parameters: Vec<FormalParameter>,
     pub node_context: NodeContext,
     is_multiline: bool,
+    starts_inline: bool,
+    item_row_breaks: Vec<bool>,
 }
 
 impl FormalParameters {
     pub fn new(node: Node) -> Self {
         assert_check(node, "formal_parameters");
 
-        let formal_parameters = node
-            .try_cs_by_k("formal_parameter")
-            .into_iter()
-            .map(FormalParameter::new)
-            .collect();
+        let children = node.try_cs_by_k("formal_parameter");
+        let formal_parameters = children.iter().copied().map(FormalParameter::new).collect();
 
         let is_multiline = node.start_position().row != node.end_position().row;
+        let starts_inline = children
+            .first()
+            .is_some_and(|first| first.start_position().row == node.start_position().row);
+        let item_row_breaks = children
+            .windows(2)
+            .map(|w| w[0].end_position().row < w[1].start_position().row)
+            .collect();
 
         Self {
             formal_parameters,
             node_context: NodeContext::with_punctuation(&node),
             is_multiline,
+            starts_inline,
+            item_row_breaks,
         }
     }
 }
@@ -209,6 +217,24 @@ impl<'a> DocBuild<'a> for FormalParameters {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let parameters_doc = b.to_docs(&self.formal_parameters);
+            let has_row_breaks = self.item_row_breaks.iter().any(|&br| br);
+
+            if b.preserve_newlines() && self.is_multiline && self.starts_inline && has_row_breaks {
+                let mut parts = vec![b.txt("(")];
+                for (i, doc) in parameters_doc.iter().enumerate() {
+                    if i > 0 {
+                        if self.item_row_breaks[i - 1] {
+                            parts.push(b.indent(b.indent(b.nl())));
+                        } else {
+                            parts.push(b.txt(" "));
+                        }
+                    }
+                    parts.push(*doc);
+                }
+                parts.push(b.txt(")"));
+                result.push(b.concat(parts));
+                return;
+            }
 
             let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
             let open = Insertable::new(None, Some("("), Some(b.maybeline()));
@@ -607,7 +633,7 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                     parts.push(doc);
                     if i < docs.len() - 1 {
                         if self.item_row_breaks[i] {
-                            parts.push(b.indent(b.indent(b.nl())));
+                            parts.push(b.indent(b.nl()));
                         } else {
                             parts.push(b.txt(" "));
                         }
@@ -3209,10 +3235,10 @@ impl<'a> DocBuild<'a> for TernaryExpression {
             if b.preserve_newlines() && self.is_multiline {
                 let docs = vec![
                     self.condition.build(b),
-                    b.indent(b.indent(b.nl())),
+                    b.indent(b.nl()),
                     b.txt_("?"),
                     self.consequence.build(b),
-                    b.indent(b.indent(b.nl())),
+                    b.indent(b.nl()),
                     b.txt_(":"),
                     self.alternative.build(b),
                 ];
@@ -5536,17 +5562,14 @@ impl<'a> DocBuild<'a> for MapInitializer {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.initializers);
 
-            // When inside parens and preserve_newlines is on, use double indent so
-            // entries land at statement+8 (one level from `(`, one from `{`) while
-            // `}` stays at statement level.
             if self.is_inside_parens && b.preserve_newlines() && self.is_multiline {
                 let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
                 let entries = b.intersperse(&docs, sep);
                 let inner = b.concat(vec![
                     b.txt("{"),
-                    b.indent(b.indent(b.softline())), // newline at L+8
-                    b.indent(b.indent(entries)),      // entries at L+8
-                    b.softline(),                     // newline at L (no indent)
+                    b.indent(b.softline()),
+                    b.indent(entries),
+                    b.softline(),
                     b.txt("}"),
                 ]);
                 result.push(b.group(b.concat(vec![b.force_break(), inner])));
