@@ -1,8 +1,8 @@
 public class Test {
     String m() {
         return cachedValue != null
-                ? cachedValue
-                : map.get(FALLBACK_KEY);
+            ? cachedValue
+            : map.get(FALLBACK_KEY);
     }
 
     String n() {
@@ -11,8 +11,8 @@ public class Test {
 
     String p() {
         String x = someCondition
-                ? valueA
-                : valueB;
+            ? valueA
+            : valueB;
         return x;
     }
 }
