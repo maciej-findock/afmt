@@ -1,5 +1,5 @@
 public class Me {
-  public integer prop {
+  public Integer prop {
     get {
       return prop;
     }

@@ -89,7 +89,7 @@ class NewObject {
         'b' => new String[]{'c', 'd'}
       };
     Map<String, Decimal> fmaIntegerParameterNameDefaultValue =
-      new Map<string, decimal> {
+      new Map<String, Decimal> {
         'Parameter1' => 1,
         'Parameter2' => 0,
         'Parameter3' => 500

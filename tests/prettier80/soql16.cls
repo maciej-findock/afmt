@@ -1,6 +1,6 @@
 class UTIL_SortContact_TEST {
   {
-    list<AggregateResult> queryAggResult = [
+    List<AggregateResult> queryAggResult = [
       SELECT count_distinct(Id), General_Accounting_Unit__r.Name
       FROM Allocation__c
       WHERE Opportunity__r.Name LIKE 'opp%'

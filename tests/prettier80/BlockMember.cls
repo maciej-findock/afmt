@@ -2,7 +2,7 @@ class BlockMember {
   String fieldMemberOne;
   String anotherFieldMember = 'Hello';
   private transient String anotherFieldMemberTwo;
-  static string anotherFieldMemberThree;
+  static String anotherFieldMemberThree;
 
   String propertyMemberWithGetSet { get; set; }
 

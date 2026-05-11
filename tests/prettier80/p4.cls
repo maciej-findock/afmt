@@ -1,7 +1,7 @@
 public class Me {
-  public integer MyReadOnlyProp { get; }
+  public Integer MyReadOnlyProp { get; }
 
-  public double MyReadWriteProp { get; set; }
+  public Double MyReadWriteProp { get; set; }
 
-  public string MyWriteOnlyProp { set; }
+  public String MyWriteOnlyProp { set; }
 }
