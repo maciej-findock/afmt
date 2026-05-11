@@ -174,7 +174,7 @@ impl Comment {
             } else if i == lines.len() - 1 {
                 if let Some(before_end) = trimmed.strip_suffix("*/") {
                     let content = before_end.trim();
-                    if content.is_empty() {
+                    if content.is_empty() || content.chars().all(|c| c == '*') {
                         result.push(b.txt(" */"));
                     } else {
                         result.push(b.txt(format!(" * {}", content)));
@@ -201,6 +201,37 @@ impl Comment {
                 result.push(b.nl());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Comment;
+    use crate::{
+        doc::{pretty_print, PrettyConfig},
+        doc_builder::DocBuilder,
+    };
+
+    #[test]
+    fn javadoc_closing_with_extra_star_does_not_emit_content_line() {
+        let builder = DocBuilder::new(PrettyConfig::new(4, false, true));
+        let mut docs = Vec::new();
+
+        Comment::build_javadoc(
+            &builder,
+            &mut docs,
+            vec![
+                "/**",
+                "* @Description Find Payment Profile or add them again.",
+                "**/",
+            ],
+        );
+
+        let output = pretty_print(builder.concat(docs), 80);
+        assert_eq!(
+            output,
+            "/**\n * @Description Find Payment Profile or add them again.\n */"
+        );
     }
 }
 
