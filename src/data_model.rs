@@ -1289,13 +1289,11 @@ impl<'a> DocBuild<'a> for ArgumentList {
             }
 
             // If the developer kept the first arg inline after `(` but moved a later arg onto
-            // its own line, preserve that split without adding surround()'s extra indent to the
-            // nested multiline chain in the first arg.
+            // its own line, preserve that split instead of pulling later args back up.
             if b.preserve_newlines()
                 && self.expressions.len() > 1
                 && self.open_paren_hugging
                 && self.close_paren_hugging
-                && self.has_inline_multiline_chain_arg
                 && self.has_newline_between_args
             {
                 let inner = if docs.is_empty() {
@@ -1305,8 +1303,10 @@ impl<'a> DocBuild<'a> for ArgumentList {
                     for (i, doc) in docs.iter().enumerate() {
                         if i > 0 {
                             parts.push(b.indent(b.nl()));
+                            parts.push(b.indent(*doc));
+                        } else {
+                            parts.push(*doc);
                         }
-                        parts.push(*doc);
                     }
                     b.concat(parts)
                 };
