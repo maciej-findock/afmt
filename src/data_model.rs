@@ -624,11 +624,14 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                         b.txt("}"),
                     ]));
                 }
-            } else if b.preserve_newlines() && !self.is_multiline && has_row_breaks {
-                // First item on same line as { but items overflow to next rows —
-                // preserve the source row grouping: items sharing a row stay together.
-                // commas are already in each item's NodeContext; we only add spacing
-                let mut parts = vec![b.txt("{")];
+            } else if b.preserve_newlines() && has_row_breaks {
+                // Preserve the source row grouping: items sharing a row stay together.
+                // Commas are already in each item's NodeContext; we only add spacing.
+                let mut parts = if self.is_multiline {
+                    vec![b.txt("{"), b.indent(b.nl())]
+                } else {
+                    vec![b.txt("{")]
+                };
                 for (i, doc) in docs.iter().enumerate() {
                     parts.push(doc);
                     if i < docs.len() - 1 {
@@ -638,6 +641,9 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                             parts.push(b.txt(" "));
                         }
                     }
+                }
+                if self.is_multiline {
+                    parts.push(b.nl());
                 }
                 parts.push(b.txt("}"));
                 result.push(b.concat(parts));
