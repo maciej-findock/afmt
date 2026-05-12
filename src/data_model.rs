@@ -1533,7 +1533,7 @@ impl<'a> DocBuild<'a> for BinaryExpression {
                         // inside a paren → add single indent so it sits visually inside the paren
                         b.group(b.indent(inner))
                     } else {
-                        b.group(inner)
+                        b.group(b.indent(inner))
                     }
                 } else {
                     b.group(inner)
@@ -1546,7 +1546,7 @@ impl<'a> DocBuild<'a> for BinaryExpression {
                 if context.is_parent_return_statement {
                     b.group(b.indent(b.indent(inner)))
                 } else {
-                    b.group(inner)
+                    b.group(b.indent(inner))
                 }
             } else {
                 b.group_indent(inner)
