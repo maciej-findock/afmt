@@ -624,11 +624,14 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                         b.txt("}"),
                     ]));
                 }
-            } else if b.preserve_newlines() && !self.is_multiline && has_row_breaks {
-                // First item on same line as { but items overflow to next rows —
-                // preserve the source row grouping: items sharing a row stay together.
-                // commas are already in each item's NodeContext; we only add spacing
-                let mut parts = vec![b.txt("{")];
+            } else if b.preserve_newlines() && has_row_breaks {
+                // Preserve the source row grouping: items sharing a row stay together.
+                // Commas are already in each item's NodeContext; we only add spacing.
+                let mut parts = if self.is_multiline {
+                    vec![b.txt("{"), b.indent(b.nl())]
+                } else {
+                    vec![b.txt("{")]
+                };
                 for (i, doc) in docs.iter().enumerate() {
                     parts.push(doc);
                     if i < docs.len() - 1 {
@@ -638,6 +641,9 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                             parts.push(b.txt(" "));
                         }
                     }
+                }
+                if self.is_multiline {
+                    parts.push(b.nl());
                 }
                 parts.push(b.txt("}"));
                 result.push(b.concat(parts));
@@ -1283,13 +1289,11 @@ impl<'a> DocBuild<'a> for ArgumentList {
             }
 
             // If the developer kept the first arg inline after `(` but moved a later arg onto
-            // its own line, preserve that split without adding surround()'s extra indent to the
-            // nested multiline chain in the first arg.
+            // its own line, preserve that split instead of pulling later args back up.
             if b.preserve_newlines()
                 && self.expressions.len() > 1
                 && self.open_paren_hugging
                 && self.close_paren_hugging
-                && self.has_inline_multiline_chain_arg
                 && self.has_newline_between_args
             {
                 let inner = if docs.is_empty() {
@@ -1299,8 +1303,10 @@ impl<'a> DocBuild<'a> for ArgumentList {
                     for (i, doc) in docs.iter().enumerate() {
                         if i > 0 {
                             parts.push(b.indent(b.nl()));
+                            parts.push(b.indent(doc));
+                        } else {
+                            parts.push(*doc);
                         }
-                        parts.push(*doc);
                     }
                     b.concat(parts)
                 };
@@ -1527,7 +1533,7 @@ impl<'a> DocBuild<'a> for BinaryExpression {
                         // inside a paren → add single indent so it sits visually inside the paren
                         b.group(b.indent(inner))
                     } else {
-                        b.group(inner)
+                        b.group(b.indent(inner))
                     }
                 } else {
                     b.group(inner)
@@ -1540,7 +1546,7 @@ impl<'a> DocBuild<'a> for BinaryExpression {
                 if context.is_parent_return_statement {
                     b.group(b.indent(b.indent(inner)))
                 } else {
-                    b.group(inner)
+                    b.group(b.indent(inner))
                 }
             } else {
                 b.group_indent(inner)
@@ -2293,7 +2299,7 @@ impl<'a> DocBuild<'a> for ConstructorBody {
 
                 if !self.statements.is_empty() {
                     if c.has_trailing_newline {
-                        result.push(b.empty_new_line());
+                        result.push(b.indent(b.empty_new_line()));
                     } else {
                         result.push(b.indent(b.nl()));
                     }
