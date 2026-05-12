@@ -1137,18 +1137,30 @@ pub struct ArgumentList {
     // a method_invocation). Used to suppress surround()'s extra indent so only the chain's own
     // group_indent_concat contributes, giving consistent +4 at each level.
     single_arg_is_chain: bool,
+    // true when an inline argument list contains an argument whose own chained expression spans
+    // rows. Used to avoid stacking surround()'s indent on top of the nested chain indent.
+    has_inline_multiline_chain_arg: bool,
+    // true when the original source contains a newline between two top-level args.
+    has_newline_between_args: bool,
 }
 
 impl ArgumentList {
+    fn is_chain_node(node: &Node) -> bool {
+        matches!(node.kind(), "method_invocation" | "field_access")
+            && node.child_by_field_name("object").is_some()
+    }
+
     pub fn new(node: Node) -> Self {
         let children = node.children_vec();
         let expressions = children.iter().map(|n| Expression::new(*n)).collect();
 
         // is_multiline: true when first arg is below `(`, OR any two consecutive args are on
         // separate rows. An arg whose internal content spans rows does not count by itself.
+        let source = get_source_code();
         let args_are_multiline = children
             .windows(2)
-            .any(|w| w[0].end_position().row < w[1].start_position().row);
+            .any(|w| source[w[0].end_byte()..w[1].start_byte()].contains('\n'));
+        let has_newline_between_args = args_are_multiline;
         let is_multiline = args_are_multiline
             || children
                 .first()
@@ -1185,6 +1197,9 @@ impl ArgumentList {
                     obj.kind() == "method_invocation" || obj.kind() == "object_creation_expression"
                 })
                 .unwrap_or(false);
+        let has_inline_multiline_chain_arg = children.iter().any(|child| {
+            child.start_position().row != child.end_position().row && Self::is_chain_node(child)
+        });
         Self {
             expressions,
             node_context: NodeContext::with_punctuation(&node),
@@ -1194,6 +1209,8 @@ impl ArgumentList {
             close_paren_hugging,
             same_line_nesting_depth,
             single_arg_is_chain,
+            has_inline_multiline_chain_arg,
+            has_newline_between_args,
         }
     }
 }
@@ -1262,6 +1279,48 @@ impl<'a> DocBuild<'a> for ArgumentList {
                     close_nl,
                     b.txt(")"),
                 ])));
+                return;
+            }
+
+            // If the developer kept the first arg inline after `(` but moved a later arg onto
+            // its own line, preserve that split without adding surround()'s extra indent to the
+            // nested multiline chain in the first arg.
+            if b.preserve_newlines()
+                && self.expressions.len() > 1
+                && self.open_paren_hugging
+                && self.close_paren_hugging
+                && self.has_inline_multiline_chain_arg
+                && self.has_newline_between_args
+            {
+                let inner = if docs.is_empty() {
+                    b.nil()
+                } else {
+                    let mut parts = Vec::with_capacity(docs.len() * 2 - 1);
+                    for (i, doc) in docs.iter().enumerate() {
+                        if i > 0 {
+                            parts.push(b.indent(b.nl()));
+                        }
+                        parts.push(*doc);
+                    }
+                    b.concat(parts)
+                };
+                result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));
+                return;
+            }
+
+            // If args stay inline as a list, but one arg contains its own multiline chain,
+            // avoid adding surround()'s extra indent on top of the chain's continuation indent.
+            if b.preserve_newlines()
+                && !self.is_multiline
+                && self.expressions.len() > 1
+                && self.open_paren_hugging
+                && self.close_paren_hugging
+                && self.has_inline_multiline_chain_arg
+                && !self.has_newline_between_args
+            {
+                let sep = Insertable::new::<&str>(None, None, Some(b.txt(" ")));
+                let inner = b.intersperse(&docs, sep);
+                result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));
                 return;
             }
 
@@ -1628,6 +1687,10 @@ impl<'a> DocBuild<'a> for VariableDeclarator {
                 docs.push(b.txt(" "));
                 docs.push(value.build(b));
                 result.push(b.concat(docs));
+            } else if b.preserve_newlines() && self.is_value_on_new_line {
+                docs.push(b.nl());
+                docs.push(value.build(b));
+                result.push(b.group(b.concat(vec![b.force_break(), b.indent(b.concat(docs))])));
             } else if b.preserve_newlines() && !self.is_value_on_new_line {
                 // Value was on same line as = in source: no break point at =.
                 // The value itself handles its own vertical layout.
@@ -2714,6 +2777,7 @@ pub struct EnumBody {
     enum_constants: Vec<EnumConstant>,
     pub node_context: NodeContext,
     is_multiline: bool,
+    item_row_breaks: Vec<bool>,
 }
 
 impl EnumBody {
@@ -2725,6 +2789,11 @@ impl EnumBody {
             .into_iter()
             .map(|n| EnumConstant::new(n))
             .collect();
+        let constant_nodes = node.try_cs_by_k("enum_constant");
+        let item_row_breaks = constant_nodes
+            .windows(2)
+            .map(|w| get_source_code()[w[0].end_byte()..w[1].start_byte()].contains('\n'))
+            .collect();
 
         let is_multiline = node.start_position().row != node.end_position().row;
 
@@ -2732,6 +2801,7 @@ impl EnumBody {
             enum_constants,
             node_context: NodeContext::with_punctuation(&node),
             is_multiline,
+            item_row_breaks,
         }
     }
 }
@@ -2743,6 +2813,7 @@ impl<'a> DocBuild<'a> for EnumBody {
 
         if bucket.dangling_comments.is_empty() {
             let docs = b.to_docs(&self.enum_constants);
+            let has_row_breaks = self.item_row_breaks.iter().any(|&br| br);
 
             if docs.is_empty() {
                 return result.push(b.concat(vec![b.txt("{"), b.nl(), b.txt("}")]));
@@ -2754,6 +2825,22 @@ impl<'a> DocBuild<'a> for EnumBody {
                 let open = Insertable::new(None, Some("{"), Some(b.maybeline()));
                 let close = Insertable::new(Some(b.maybeline()), Some("}"), None);
                 b.group_surround(&docs, sep, open, close)
+            } else if b.preserve_newlines() && self.is_multiline && has_row_breaks {
+                // Preserve source row grouping: constants sharing a row stay together.
+                let mut parts = vec![b.txt("{"), b.indent(b.nl())];
+                for (i, doc) in docs.iter().enumerate() {
+                    parts.push(*doc);
+                    if i < docs.len() - 1 {
+                        if self.item_row_breaks[i] {
+                            parts.push(b.indent(b.nl()));
+                        } else {
+                            parts.push(b.txt(" "));
+                        }
+                    }
+                }
+                parts.push(b.nl());
+                parts.push(b.txt("}"));
+                b.concat(parts)
             } else {
                 // preserve_newlines=false (always expand) or source was multiline (keep multiline)
                 let sep = Insertable::new::<&str>(None, None, Some(b.nl()));

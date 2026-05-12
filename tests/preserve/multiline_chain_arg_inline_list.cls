@@ -1,0 +1,7 @@
+public class A {
+    public void m() {
+        Object value = ServiceFactory
+            .buildValue(SelectorFactory.selectAllByName()
+                .get(this.request.item.provider), this.request.item);
+    }
+}
