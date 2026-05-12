@@ -1,0 +1,7 @@
+public class A {
+    void m() {
+        String reportType = extension.getName();
+        Map<String, String> values =
+            selectValues(reportType, objectName);
+    }
+}
