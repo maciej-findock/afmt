@@ -1303,7 +1303,7 @@ impl<'a> DocBuild<'a> for ArgumentList {
                     for (i, doc) in docs.iter().enumerate() {
                         if i > 0 {
                             parts.push(b.indent(b.nl()));
-                            parts.push(b.indent(*doc));
+                            parts.push(b.indent(doc));
                         } else {
                             parts.push(*doc);
                         }
