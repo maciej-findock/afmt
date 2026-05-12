@@ -130,10 +130,11 @@ max_width = 80
 indent_size = 4
 
 # Preserve developer-chosen vertical layout.
-# When true, any argument list, parameter list, array initializer, or map
-# initializer that was written multiline in the source stays multiline in the
-# output. Only horizontal formatting (spacing, indentation) is corrected.
-preserve_newlines = false
+# When true, afmt keeps source-introduced line breaks in supported multiline
+# constructs such as argument lists, parameter lists, array/set/map initializers,
+# method chains, binary expressions, and implements clauses.
+# Horizontal formatting such as spacing and indentation is still corrected.
+preserve_newlines = true
 
 # Normalise JavaDoc comments (/** ... */) to standard alignment.
 # When false (default), block comment content is preserved verbatim.
