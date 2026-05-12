@@ -2299,7 +2299,7 @@ impl<'a> DocBuild<'a> for ConstructorBody {
 
                 if !self.statements.is_empty() {
                     if c.has_trailing_newline {
-                        result.push(b.empty_new_line());
+                        result.push(b.indent(b.empty_new_line()));
                     } else {
                         result.push(b.indent(b.nl()));
                     }
