@@ -1137,9 +1137,17 @@ pub struct ArgumentList {
     // a method_invocation). Used to suppress surround()'s extra indent so only the chain's own
     // group_indent_concat contributes, giving consistent +4 at each level.
     single_arg_is_chain: bool,
+    // true when an inline argument list contains an argument whose own chained expression spans
+    // rows. Used to avoid stacking surround()'s indent on top of the nested chain indent.
+    has_inline_multiline_chain_arg: bool,
 }
 
 impl ArgumentList {
+    fn is_chain_node(node: &Node) -> bool {
+        matches!(node.kind(), "method_invocation" | "field_access")
+            && node.child_by_field_name("object").is_some()
+    }
+
     pub fn new(node: Node) -> Self {
         let children = node.children_vec();
         let expressions = children.iter().map(|n| Expression::new(*n)).collect();
@@ -1185,6 +1193,9 @@ impl ArgumentList {
                     obj.kind() == "method_invocation" || obj.kind() == "object_creation_expression"
                 })
                 .unwrap_or(false);
+        let has_inline_multiline_chain_arg = children.iter().any(|child| {
+            child.start_position().row != child.end_position().row && Self::is_chain_node(child)
+        });
         Self {
             expressions,
             node_context: NodeContext::with_punctuation(&node),
@@ -1194,6 +1205,7 @@ impl ArgumentList {
             close_paren_hugging,
             same_line_nesting_depth,
             single_arg_is_chain,
+            has_inline_multiline_chain_arg,
         }
     }
 }
@@ -1262,6 +1274,21 @@ impl<'a> DocBuild<'a> for ArgumentList {
                     close_nl,
                     b.txt(")"),
                 ])));
+                return;
+            }
+
+            // If args stay inline as a list, but one arg contains its own multiline chain,
+            // avoid adding surround()'s extra indent on top of the chain's continuation indent.
+            if b.preserve_newlines()
+                && !self.is_multiline
+                && self.expressions.len() > 1
+                && self.open_paren_hugging
+                && self.close_paren_hugging
+                && self.has_inline_multiline_chain_arg
+            {
+                let sep = Insertable::new::<&str>(None, None, Some(b.txt(" ")));
+                let inner = b.intersperse(&docs, sep);
+                result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));
                 return;
             }
 
