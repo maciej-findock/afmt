@@ -2792,9 +2792,7 @@ impl EnumBody {
         let constant_nodes = node.try_cs_by_k("enum_constant");
         let item_row_breaks = constant_nodes
             .windows(2)
-            .map(|w| {
-                get_source_code()[w[0].end_byte()..w[1].start_byte()].contains('\n')
-            })
+            .map(|w| get_source_code()[w[0].end_byte()..w[1].start_byte()].contains('\n'))
             .collect();
 
         let is_multiline = node.start_position().row != node.end_position().row;
