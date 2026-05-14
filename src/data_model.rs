@@ -633,7 +633,11 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                     vec![b.txt("{")]
                 };
                 for (i, doc) in docs.iter().enumerate() {
-                    parts.push(doc);
+                    if self.is_multiline {
+                        parts.push(b.indent(doc));
+                    } else {
+                        parts.push(doc);
+                    }
                     if i < docs.len() - 1 {
                         if self.item_row_breaks[i] {
                             parts.push(b.indent(b.nl()));
@@ -1420,6 +1424,7 @@ pub struct BinaryExpressionContext {
     chain_is_multiline: bool,     // any node in the chain (including descendants) spans rows
     is_top_level_condition: bool, // direct child of an if/while/for condition parens
     is_inside_binary_paren: bool, // inside (...) that is directly inside another binary expression
+    is_inside_argument_list: bool, // direct child of an argument_list; surround() there already provides indentation
 }
 
 #[derive(Debug)]
@@ -1462,6 +1467,7 @@ impl BinaryExpression {
             });
         let is_inside_binary_paren = parent.kind() == "parenthesized_expression"
             && parent.parent().is_some_and(|gp| is_binary_exp(&gp));
+        let is_inside_argument_list = parent.kind() == "argument_list";
 
         BinaryExpressionContext {
             has_parent_same_precedence,
@@ -1473,6 +1479,7 @@ impl BinaryExpression {
             chain_is_multiline,
             is_top_level_condition,
             is_inside_binary_paren,
+            is_inside_argument_list,
         }
     }
 
@@ -1532,6 +1539,9 @@ impl<'a> DocBuild<'a> for BinaryExpression {
                         // break_before_op: developer aligned operator as continuation (e.g. \n||)
                         // inside a paren → add single indent so it sits visually inside the paren
                         b.group(b.indent(inner))
+                    } else if context.is_inside_argument_list {
+                        // argument_list surround() already contributes one indent level
+                        b.group(inner)
                     } else {
                         b.group(b.indent(inner))
                     }
