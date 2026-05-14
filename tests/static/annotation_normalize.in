@@ -1,0 +1,20 @@
+@istest
+public class A {
+
+    @testsetup
+    static void setup() {}
+
+    @testvisible
+    private static Integer count = 0;
+
+    @auraenabled(cacheable=true)
+    public static String getData() {
+        return 'data';
+    }
+
+    @future
+    public static void runAsync() {}
+
+    @suppresswarnings('PMD')
+    public void m() {}
+}

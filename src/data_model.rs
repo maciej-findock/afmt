@@ -398,8 +398,12 @@ impl Annotation {
             .try_c_by_n("arguments")
             .map(AnnotationArgumentList::new);
 
+        let name_node = node.c_by_n("name");
         Self {
-            name: ValueNode::new(node.c_by_n("name")),
+            name: ValueNode {
+                value: normalize_annotation_name(&name_node.value()).to_string(),
+                node_context: NodeContext::with_punctuation(&name_node),
+            },
             arguments,
             node_context: NodeContext::with_punctuation(&node),
         }
@@ -1032,7 +1036,11 @@ impl MethodInvocation {
     pub fn new(node: Node) -> Self {
         assert_check(node, "method_invocation");
 
-        let name = ValueNode::new(node.c_by_n("name"));
+        let name_node = node.c_by_n("name");
+        let name = ValueNode {
+            value: normalize_method_name(&name_node.value()),
+            node_context: NodeContext::with_punctuation(&name_node),
+        };
         let arguments = ArgumentList::new(node.c_by_n("arguments"));
 
         let kind = if let Some(obj) = node.try_c_by_n("object") {
@@ -2153,7 +2161,9 @@ impl ScopedTypeIdentifier {
 
         let prefix_node = node.first_c();
         let scoped_choice = match prefix_node.kind() {
-            "type_identifier" => ScopedChoice::TypeIdentifier(prefix_node.value()),
+            "type_identifier" => {
+                ScopedChoice::TypeIdentifier(normalize_namespace_prefix(&prefix_node.value()))
+            }
             "scoped_type_identifier" => ScopedChoice::Scoped(Box::new(Self::new(prefix_node))),
             "generic_type" => ScopedChoice::Generic(Box::new(GenericType::new(prefix_node))),
             _ => panic_unknown_node(prefix_node, "ScopedTypeIdentifier"),
@@ -2660,6 +2670,11 @@ impl FieldAccess {
         let obj_node = node.c_by_n("object");
         let object = if obj_node.kind() == "super" {
             MethodObject::Super(Super::new(obj_node))
+        } else if obj_node.kind() == "identifier" {
+            MethodObject::Primary(Box::new(PrimaryExpression::Identifier(ValueNode {
+                value: normalize_namespace_prefix(&obj_node.value()),
+                node_context: NodeContext::with_punctuation(&obj_node),
+            })))
         } else {
             MethodObject::Primary(Box::new(PrimaryExpression::new(obj_node)))
         };
@@ -6332,7 +6347,7 @@ impl ValueNode {
 impl<'a> DocBuild<'a> for ValueNode {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt(&self.value));
+            result.push(b.txt(normalize_managed_prefix(&self.value)));
         });
     }
 }

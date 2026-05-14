@@ -141,6 +141,11 @@ preserve_newlines = true
 # When true, each line is trimmed and prefixed with " * ", the opening
 # /** is placed on its own line, and the closing */ is normalised to " */".
 format_doc_comments = false
+
+# Namespace prefixes to normalise to lowercase (e.g. CPM → cpm).
+# Only identifiers that exactly match a listed prefix (case-insensitive) are
+# lowercased. Leave empty to disable namespace normalisation.
+# namespace_prefixes = ["cpm", "myns"]
 ```
 
 ### `preserve_newlines`
@@ -197,6 +202,25 @@ standard alignment:
  * @param x The value.
  */
 ```
+
+### `namespace_prefixes`
+
+Apex allows managed packages to prefix type and method references with a
+namespace (e.g. `CPM.PaymentRequest`). By default afmt leaves the casing of
+these prefixes untouched. When `namespace_prefixes` is set, any matching
+identifier is normalised to lowercase:
+
+```apex
+// source
+CPM.PaymentRequest req = CPM.PaymentRequest.newInstance();
+
+// namespace_prefixes = ["cpm"] → normalised
+cpm.PaymentRequest req = cpm.PaymentRequest.newInstance();
+```
+
+Matching is case-insensitive, so `"cpm"` matches `CPM`, `cpm`, and `Cpm` in
+the source. Only identifiers that appear as a namespace prefix in a scoped
+type or method-call expression are affected — plain class names are not changed.
 
 ### `// afmt:ignore`
 

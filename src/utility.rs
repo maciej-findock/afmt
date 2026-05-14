@@ -20,6 +20,67 @@ pub fn truncate_snippet(snippet: &str) -> String {
     }
 }
 
+/// Lowercase a namespace prefix if it appears in the configured `namespace_prefixes` list.
+/// Comparison is case-insensitive so `CPM`, `cpm`, and `Cpm` all match a listed entry of `CPM`.
+pub fn normalize_namespace_prefix(value: &str) -> String {
+    let prefixes = get_namespace_prefixes();
+    if prefixes.iter().any(|p| p.eq_ignore_ascii_case(value)) {
+        value.to_lowercase()
+    } else {
+        value.to_owned()
+    }
+}
+
+/// Lowercase the namespace prefix of a managed-package identifier (e.g. `CPM__Status__c` → `cpm__Status__c`).
+/// Only the `PREFIX__` part is lowercased; the rest of the identifier is unchanged.
+pub fn normalize_managed_prefix(value: &str) -> String {
+    let prefixes = get_namespace_prefixes();
+    for prefix in prefixes {
+        let plen = prefix.len();
+        if value.len() > plen + 2
+            && value[..plen].eq_ignore_ascii_case(prefix)
+            && value.as_bytes()[plen] == b'_'
+            && value.as_bytes()[plen + 1] == b'_'
+        {
+            return format!("{}__{}", prefix.to_lowercase(), &value[plen + 2..]);
+        }
+    }
+    value.to_owned()
+}
+
+pub fn normalize_annotation_name(value: &str) -> &str {
+    match value.to_lowercase().as_str() {
+        "auraenabled" => "AuraEnabled",
+        "deprecated" => "Deprecated",
+        "future" => "Future",
+        "httpdelete" => "HttpDelete",
+        "httpget" => "HttpGet",
+        "httppatch" => "HttpPatch",
+        "httppost" => "HttpPost",
+        "httpput" => "HttpPut",
+        "invocablemethod" => "InvocableMethod",
+        "invocablevariable" => "InvocableVariable",
+        "istest" => "IsTest",
+        "jsonaccess" => "JsonAccess",
+        "namespaceaccessible" => "NamespaceAccessible",
+        "readonly" => "ReadOnly",
+        "remoteaction" => "RemoteAction",
+        "restresource" => "RestResource",
+        "suppresswarnings" => "SuppressWarnings",
+        "testsetup" => "TestSetup",
+        "testvisible" => "TestVisible",
+        _ => value,
+    }
+}
+
+pub fn normalize_method_name(value: &str) -> String {
+    let mut chars = value.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_lowercase().collect::<String>() + chars.as_str(),
+    }
+}
+
 pub fn normalize_apex_type_name(value: &str) -> &str {
     match value {
         "blob" => "Blob",
@@ -59,6 +120,28 @@ pub fn set_thread_source_code(source_code: String) {
 
 pub fn get_source_code() -> &'static str {
     THREAD_SOURCE_CODE.with(|sc| sc.get().expect("Source code not set for this thread"))
+}
+
+thread_local! {
+    static THREAD_NAMESPACE_PREFIXES: Cell<Option<&'static Vec<String>>> = const{ Cell::new(None) };
+}
+
+pub fn set_thread_namespace_prefixes(prefixes: Vec<String>) {
+    let leaked: &'static Vec<String> = Box::leak(Box::new(prefixes));
+    THREAD_NAMESPACE_PREFIXES.with(|p| {
+        if p.get().is_some() {
+            panic!("Namespace prefixes already set for this thread");
+        }
+        p.set(Some(leaked));
+    });
+}
+
+fn get_namespace_prefixes() -> &'static [String] {
+    static EMPTY: Vec<String> = Vec::new();
+    THREAD_NAMESPACE_PREFIXES
+        .with(|p| p.get())
+        .map(|v| v.as_slice())
+        .unwrap_or(EMPTY.as_slice())
 }
 
 thread_local! {
