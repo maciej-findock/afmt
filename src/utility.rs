@@ -24,10 +24,7 @@ pub fn truncate_snippet(snippet: &str) -> String {
 /// Comparison is case-insensitive so `CPM`, `cpm`, and `Cpm` all match a listed entry of `CPM`.
 pub fn normalize_namespace_prefix(value: &str) -> String {
     let prefixes = get_namespace_prefixes();
-    if prefixes
-        .iter()
-        .any(|p| p.eq_ignore_ascii_case(value))
-    {
+    if prefixes.iter().any(|p| p.eq_ignore_ascii_case(value)) {
         value.to_lowercase()
     } else {
         value.to_owned()
