@@ -5,3 +5,6 @@ max_width = 80
 
 # Indentation size in spaces
 indent_size = 2
+
+# Namespace prefixes to normalize to lowercase (e.g. NS → ns)
+namespace_prefixes = ["ns"]

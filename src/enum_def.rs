@@ -6,7 +6,7 @@ use crate::{
     doc_builder::{DocBuilder, Insertable},
     utility::{
         assert_check, build_with_comments_and_punc, get_comment_bucket, normalize_apex_type_name,
-        panic_unknown_node,
+        normalize_managed_prefix, panic_unknown_node,
     },
 };
 use tree_sitter::Node;
@@ -169,7 +169,8 @@ impl<'a> DocBuild<'a> for SimpleType {
         match self {
             Self::Identifier(n) => {
                 build_with_comments_and_punc(b, &n.node_context, result, |b, result| {
-                    result.push(b.txt(normalize_apex_type_name(&n.value)));
+                    let name = normalize_apex_type_name(&n.value);
+                    result.push(b.txt(normalize_managed_prefix(name)));
                 });
             }
             Self::Java(n) => {

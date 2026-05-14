@@ -6347,7 +6347,7 @@ impl ValueNode {
 impl<'a> DocBuild<'a> for ValueNode {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt(&self.value));
+            result.push(b.txt(normalize_managed_prefix(&self.value)));
         });
     }
 }

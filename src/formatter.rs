@@ -5,7 +5,7 @@ use crate::doc_builder::DocBuilder;
 use crate::message_helper::{red, yellow};
 use crate::utility::{
     assert_no_missing_comments, collect_comments, enrich, set_thread_comment_map,
-    set_thread_source_code, truncate_snippet,
+    set_thread_namespace_prefixes, set_thread_source_code, truncate_snippet,
 };
 use serde::Deserialize;
 use std::sync::mpsc;
@@ -29,6 +29,9 @@ pub struct Config {
 
     #[serde(default)]
     pub format_doc_comments: bool,
+
+    #[serde(default)]
+    pub namespace_prefixes: Vec<String>,
 }
 
 fn default_max_width() -> u32 {
@@ -46,6 +49,7 @@ impl Default for Config {
             indent_size: default_indent_size(),
             preserve_newlines: false,
             format_doc_comments: false,
+            namespace_prefixes: Vec::new(),
         }
     }
 }
@@ -57,6 +61,7 @@ impl Config {
             indent_size: 2,
             preserve_newlines: false,
             format_doc_comments: false,
+            namespace_prefixes: Vec::new(),
         }
     }
 
@@ -155,6 +160,7 @@ impl Formatter {
     pub fn format_one(source_code: &str, config: Config) -> String {
         let ast_tree = Formatter::parse(source_code);
         set_thread_source_code(source_code.to_string()); // important to set thread level source code now;
+        set_thread_namespace_prefixes(config.namespace_prefixes.clone());
 
         let mut cursor = ast_tree.walk();
         let mut comment_map = CommentMap::new();
