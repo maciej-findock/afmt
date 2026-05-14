@@ -633,7 +633,11 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                     vec![b.txt("{")]
                 };
                 for (i, doc) in docs.iter().enumerate() {
-                    parts.push(doc);
+                    if self.is_multiline {
+                        parts.push(b.indent(doc));
+                    } else {
+                        parts.push(doc);
+                    }
                     if i < docs.len() - 1 {
                         if self.item_row_breaks[i] {
                             parts.push(b.indent(b.nl()));
