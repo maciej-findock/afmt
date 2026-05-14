@@ -1,6 +1,6 @@
-@isTest
+@IsTest
 private class UTIL_SortContact_TEST {
-  @isTest
+  @IsTest
   private static void sortContactsLastFirstName() {
     List<Schema.ApexTrigger> expectedResults = [
       SELECT Name

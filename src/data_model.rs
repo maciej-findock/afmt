@@ -398,8 +398,12 @@ impl Annotation {
             .try_c_by_n("arguments")
             .map(AnnotationArgumentList::new);
 
+        let name_node = node.c_by_n("name");
         Self {
-            name: ValueNode::new(node.c_by_n("name")),
+            name: ValueNode {
+                value: normalize_annotation_name(&name_node.value()).to_string(),
+                node_context: NodeContext::with_punctuation(&name_node),
+            },
             arguments,
             node_context: NodeContext::with_punctuation(&node),
         }

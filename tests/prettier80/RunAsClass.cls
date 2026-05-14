@@ -1,4 +1,4 @@
-@isTest
+@IsTest
 class RunAsClass {
   static testMethod void runAsTest() {
     User userOne = [SELECT Id FROM User LIMIT 1];

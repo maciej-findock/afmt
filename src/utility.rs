@@ -20,6 +20,31 @@ pub fn truncate_snippet(snippet: &str) -> String {
     }
 }
 
+pub fn normalize_annotation_name(value: &str) -> &str {
+    match value.to_lowercase().as_str() {
+        "auraenabled" => "AuraEnabled",
+        "deprecated" => "Deprecated",
+        "future" => "Future",
+        "httpdelete" => "HttpDelete",
+        "httpget" => "HttpGet",
+        "httppatch" => "HttpPatch",
+        "httppost" => "HttpPost",
+        "httpput" => "HttpPut",
+        "invocablemethod" => "InvocableMethod",
+        "invocablevariable" => "InvocableVariable",
+        "istest" => "IsTest",
+        "jsonaccess" => "JsonAccess",
+        "namespaceaccessible" => "NamespaceAccessible",
+        "readonly" => "ReadOnly",
+        "remoteaction" => "RemoteAction",
+        "restresource" => "RestResource",
+        "suppresswarnings" => "SuppressWarnings",
+        "testsetup" => "TestSetup",
+        "testvisible" => "TestVisible",
+        _ => value,
+    }
+}
+
 pub fn normalize_method_name(value: &str) -> String {
     let mut chars = value.chars();
     match chars.next() {
