@@ -2670,6 +2670,11 @@ impl FieldAccess {
         let obj_node = node.c_by_n("object");
         let object = if obj_node.kind() == "super" {
             MethodObject::Super(Super::new(obj_node))
+        } else if obj_node.kind() == "identifier" {
+            MethodObject::Primary(Box::new(PrimaryExpression::Identifier(ValueNode {
+                value: normalize_namespace_prefix(&obj_node.value()),
+                node_context: NodeContext::with_punctuation(&obj_node),
+            })))
         } else {
             MethodObject::Primary(Box::new(PrimaryExpression::new(obj_node)))
         };
