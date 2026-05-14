@@ -2161,7 +2161,9 @@ impl ScopedTypeIdentifier {
 
         let prefix_node = node.first_c();
         let scoped_choice = match prefix_node.kind() {
-            "type_identifier" => ScopedChoice::TypeIdentifier(prefix_node.value()),
+            "type_identifier" => {
+                ScopedChoice::TypeIdentifier(normalize_namespace_prefix(&prefix_node.value()))
+            }
             "scoped_type_identifier" => ScopedChoice::Scoped(Box::new(Self::new(prefix_node))),
             "generic_type" => ScopedChoice::Generic(Box::new(GenericType::new(prefix_node))),
             _ => panic_unknown_node(prefix_node, "ScopedTypeIdentifier"),

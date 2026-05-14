@@ -20,6 +20,19 @@ pub fn truncate_snippet(snippet: &str) -> String {
     }
 }
 
+/// Lowercase a namespace prefix if it is written in ALL-CAPS (e.g. CPM → cpm).
+/// Mixed-case prefixes like `Schema` or `Database` are left unchanged so that
+/// outer-class references keep their PascalCase form.
+pub fn normalize_namespace_prefix(value: &str) -> String {
+    let has_upper = value.chars().any(|c| c.is_alphabetic() && c.is_uppercase());
+    let has_lower = value.chars().any(|c| c.is_alphabetic() && c.is_lowercase());
+    if value.len() >= 2 && has_upper && !has_lower {
+        value.to_lowercase()
+    } else {
+        value.to_owned()
+    }
+}
+
 pub fn normalize_annotation_name(value: &str) -> &str {
     match value.to_lowercase().as_str() {
         "auraenabled" => "AuraEnabled",

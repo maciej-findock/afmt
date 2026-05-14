@@ -1,0 +1,7 @@
+global class A extends NS.BaseClass implements NS.IFirst, ns.ISecond, Schema.SObjectType {
+    NS.SomeType field;
+
+    void m(NS.ParamType p) {
+        ns.Helper h = new NS.Helper();
+    }
+}
