@@ -20,6 +20,14 @@ pub fn truncate_snippet(snippet: &str) -> String {
     }
 }
 
+pub fn normalize_method_name(value: &str) -> String {
+    let mut chars = value.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_lowercase().collect::<String>() + chars.as_str(),
+    }
+}
+
 pub fn normalize_apex_type_name(value: &str) -> &str {
     match value {
         "blob" => "Blob",

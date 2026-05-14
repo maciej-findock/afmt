@@ -2,7 +2,7 @@ class SuperThis {
   {
     [SELECT Id, Name FROM acc].super.a;
 
-    a?.Super.Set();
+    a?.Super.set();
 
     super.a.set();
 

@@ -15,7 +15,7 @@ class Chaining {
       FROM Account
       WHERE Id = :accId
     ]
-      .Name()
+      .name()
       .bbbbbbbbbbbbbbbbbbbbb
       .cccccccccccccccccc
       .aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa();
@@ -26,7 +26,7 @@ class Chaining {
         FROM Account
         WHERE Id = :accId
       ]
-        .Name()
+        .name()
         .bbbbbbbbbbbbbbbbbbbbb
         .cccccccccccccccccc
         .aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa();

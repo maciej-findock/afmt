@@ -1032,7 +1032,11 @@ impl MethodInvocation {
     pub fn new(node: Node) -> Self {
         assert_check(node, "method_invocation");
 
-        let name = ValueNode::new(node.c_by_n("name"));
+        let name_node = node.c_by_n("name");
+        let name = ValueNode {
+            value: normalize_method_name(&name_node.value()),
+            node_context: NodeContext::with_punctuation(&name_node),
+        };
         let arguments = ArgumentList::new(node.c_by_n("arguments"));
 
         let kind = if let Some(obj) = node.try_c_by_n("object") {

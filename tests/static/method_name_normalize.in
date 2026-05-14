@@ -1,0 +1,8 @@
+public class A {
+    void m() {
+        Blob b = Blob.ValueOf('hello');
+        String s = String.ValueOf(42);
+        Date d = Date.Today();
+        response.responseBody = Blob.ValueOf(JSON.Serialize(result));
+    }
+}
