@@ -140,7 +140,8 @@ pub fn normalize_apex_class_name(value: &str) -> Option<&'static str> {
 /// Configured namespace prefixes are lowercased as a fallback.
 pub fn normalize_qualifier_name(value: &str) -> String {
     let canonical = match value.to_lowercase().as_str() {
-        // Core system classes — only static methods, rarely used as variable names
+        // Static-only system classes — safe to normalise in qualifier position
+        // because they are never instantiated or used as local variable names
         "system" => Some("System"),
         "database" => Some("Database"),
         "schema" => Some("Schema"),
@@ -155,27 +156,14 @@ pub fn normalize_qualifier_name(value: &str) -> String {
         "encodingutil" => Some("EncodingUtil"),
         "flexqueue" => Some("FlexQueue"),
         "apexpages" => Some("ApexPages"),
-        // HTTP / REST — static factory or singleton-ish usage
-        "http" => Some("Http"),
-        "httprequest" => Some("HttpRequest"),
-        "httpresponse" => Some("HttpResponse"),
-        "restcontext" => Some("RestContext"),
-        "restrequest" => Some("RestRequest"),
-        "restresponse" => Some("RestResponse"),
-        // JSON / encoding — static-only
+        // JSON — static-only (JSON.serialize, JSON.deserialize, etc.)
         "json" => Some("JSON"),
-        "jsongenerator" => Some("JSONGenerator"),
-        "jsonparser" => Some("JSONParser"),
-        // Other utilities
+        // URL and Datetime — static factory methods are the common qualifier use
         "url" => Some("URL"),
         "datetime" => Some("Datetime"),
-        "logginglevel" => Some("LoggingLevel"),
-        "accesslevel" => Some("AccessLevel"),
-        "continuation" => Some("Continuation"),
-        "location" => Some("Location"),
-        "pagereference" => Some("PageReference"),
-        // Primitives that are commonly used as static class references
-        // (but NOT Map/List/Set/String/Integer/etc. which are too often variable names)
+        // Excluded (instance-method classes commonly stored in local variables):
+        // Http, HttpRequest, HttpResponse, JSONGenerator, JSONParser,
+        // RestRequest, RestResponse, RestContext, Location, Continuation, PageReference
         _ => None,
     };
     if let Some(c) = canonical {
