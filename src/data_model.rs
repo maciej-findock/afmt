@@ -915,6 +915,12 @@ impl ObjectExpression {
         //TODO: handle incoming comment node
         match node.kind() {
             "super" => Self::Super(Super::new(node)),
+            "identifier" | "type_identifier" => {
+                Self::Primary(Box::new(PrimaryExpression::Identifier(ValueNode {
+                    value: normalize_qualifier_name(&node.value()),
+                    node_context: NodeContext::with_punctuation(&node),
+                })))
+            }
             _ => Self::Primary(Box::new(PrimaryExpression::new(node))),
         }
     }
@@ -2162,7 +2168,7 @@ impl ScopedTypeIdentifier {
         let prefix_node = node.first_c();
         let scoped_choice = match prefix_node.kind() {
             "type_identifier" => {
-                ScopedChoice::TypeIdentifier(normalize_namespace_prefix(&prefix_node.value()))
+                ScopedChoice::TypeIdentifier(normalize_qualifier_name(&prefix_node.value()))
             }
             "scoped_type_identifier" => ScopedChoice::Scoped(Box::new(Self::new(prefix_node))),
             "generic_type" => ScopedChoice::Generic(Box::new(GenericType::new(prefix_node))),
@@ -2670,9 +2676,9 @@ impl FieldAccess {
         let obj_node = node.c_by_n("object");
         let object = if obj_node.kind() == "super" {
             MethodObject::Super(Super::new(obj_node))
-        } else if obj_node.kind() == "identifier" {
+        } else if obj_node.kind() == "identifier" || obj_node.kind() == "type_identifier" {
             MethodObject::Primary(Box::new(PrimaryExpression::Identifier(ValueNode {
-                value: normalize_namespace_prefix(&obj_node.value()),
+                value: normalize_qualifier_name(&obj_node.value()),
                 node_context: NodeContext::with_punctuation(&obj_node),
             })))
         } else {

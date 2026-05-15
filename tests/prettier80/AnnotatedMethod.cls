@@ -15,10 +15,10 @@ class topLevelClass {
   }
 
   @InvocableMethod(label='Label' description='Description' category='Category')
-  List<String> getAccountNames(List<ID> ids) {
+  List<String> getAccountNames(List<Id> ids) {
   }
 
   @InvocableMethod(callout=true)
-  List<String> getAccountNamesWithCallout(List<ID> ids) {
+  List<String> getAccountNamesWithCallout(List<Id> ids) {
   }
 }

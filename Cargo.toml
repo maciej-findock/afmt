@@ -1,6 +1,6 @@
 [package]
 name = "sf-afmt"
-version = "0.15.0"
+version = "0.15.1"
 edition = "2021"
 description = "Salesforce Apex formatter — FinDock edition"
 license = "MIT OR Apache-2.0"
