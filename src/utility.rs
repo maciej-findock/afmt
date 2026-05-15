@@ -48,6 +48,143 @@ pub fn normalize_managed_prefix(value: &str) -> String {
     value.to_owned()
 }
 
+/// Return the canonical Salesforce casing for a known Apex system class/type name.
+/// Returns `None` if the name is not a recognised system identifier.
+/// Matching is case-insensitive, so `system`, `System`, and `SYSTEM` all return `Some("System")`.
+pub fn normalize_apex_class_name(value: &str) -> Option<&'static str> {
+    match value.to_lowercase().as_str() {
+        // Primitives / built-in value types
+        "blob" => Some("Blob"),
+        "boolean" => Some("Boolean"),
+        "date" => Some("Date"),
+        "datetime" => Some("Datetime"),
+        "decimal" => Some("Decimal"),
+        "double" => Some("Double"),
+        "id" => Some("Id"),
+        "integer" => Some("Integer"),
+        "long" => Some("Long"),
+        "object" => Some("Object"),
+        "string" => Some("String"),
+        "time" => Some("Time"),
+        // Collection types
+        "list" => Some("List"),
+        "map" => Some("Map"),
+        "set" => Some("Set"),
+        // SObject family
+        "sobject" => Some("SObject"),
+        "sobjectfield" => Some("SObjectField"),
+        "sobjecttype" => Some("SObjectType"),
+        // Core system classes
+        "system" => Some("System"),
+        "database" => Some("Database"),
+        "schema" => Some("Schema"),
+        "test" => Some("Test"),
+        "limits" => Some("Limits"),
+        "orglimits" => Some("OrgLimits"),
+        "math" => Some("Math"),
+        "userinfo" => Some("UserInfo"),
+        "assert" => Some("Assert"),
+        "domain" => Some("Domain"),
+        "crypto" => Some("Crypto"),
+        "encodingutil" => Some("EncodingUtil"),
+        "type" => Some("Type"),
+        "timezone" => Some("TimeZone"),
+        "accesslevel" => Some("AccessLevel"),
+        "continuation" => Some("Continuation"),
+        "flexqueue" => Some("FlexQueue"),
+        "location" => Some("Location"),
+        "logginglevel" => Some("LoggingLevel"),
+        "apexpages" => Some("ApexPages"),
+        // HTTP / REST
+        "http" => Some("Http"),
+        "httprequest" => Some("HttpRequest"),
+        "httpresponse" => Some("HttpResponse"),
+        "restcontext" => Some("RestContext"),
+        "restrequest" => Some("RestRequest"),
+        "restresponse" => Some("RestResponse"),
+        "pagereference" => Some("PageReference"),
+        // JSON / encoding
+        "json" => Some("JSON"),
+        "jsongenerator" => Some("JSONGenerator"),
+        "jsonparser" => Some("JSONParser"),
+        // Other utilities
+        "url" => Some("URL"),
+        "pattern" => Some("Pattern"),
+        "matcher" => Some("Matcher"),
+        // Async / interface types
+        "queueable" => Some("Queueable"),
+        "batchable" => Some("Batchable"),
+        "schedulable" => Some("Schedulable"),
+        "callable" => Some("Callable"),
+        "comparable" => Some("Comparable"),
+        "iterable" => Some("Iterable"),
+        "iterator" => Some("Iterator"),
+        // Schema namespace
+        "describesobjectresult" => Some("DescribeSObjectResult"),
+        "describefieldresult" => Some("DescribeFieldResult"),
+        "picklistentry" => Some("PicklistEntry"),
+        "childrelationship" => Some("ChildRelationship"),
+        "recordtypeinfo" => Some("RecordTypeInfo"),
+        "fieldset" => Some("FieldSet"),
+        "fieldsetmember" => Some("FieldSetMember"),
+        "displaytype" => Some("DisplayType"),
+        "soaptype" => Some("SOAPType"),
+        _ => None,
+    }
+}
+
+/// Normalise a qualifier identifier (scoped-type prefix or method-call object).
+/// Uses a conservative subset of system class names that are almost never used
+/// as local variable names (excludes collections and primitives like Map/List/String
+/// which commonly appear as both class references and variable names).
+/// Configured namespace prefixes are lowercased as a fallback.
+pub fn normalize_qualifier_name(value: &str) -> String {
+    let canonical = match value.to_lowercase().as_str() {
+        // Core system classes — only static methods, rarely used as variable names
+        "system" => Some("System"),
+        "database" => Some("Database"),
+        "schema" => Some("Schema"),
+        "test" => Some("Test"),
+        "limits" => Some("Limits"),
+        "orglimits" => Some("OrgLimits"),
+        "math" => Some("Math"),
+        "userinfo" => Some("UserInfo"),
+        "assert" => Some("Assert"),
+        "domain" => Some("Domain"),
+        "crypto" => Some("Crypto"),
+        "encodingutil" => Some("EncodingUtil"),
+        "flexqueue" => Some("FlexQueue"),
+        "apexpages" => Some("ApexPages"),
+        // HTTP / REST — static factory or singleton-ish usage
+        "http" => Some("Http"),
+        "httprequest" => Some("HttpRequest"),
+        "httpresponse" => Some("HttpResponse"),
+        "restcontext" => Some("RestContext"),
+        "restrequest" => Some("RestRequest"),
+        "restresponse" => Some("RestResponse"),
+        // JSON / encoding — static-only
+        "json" => Some("JSON"),
+        "jsongenerator" => Some("JSONGenerator"),
+        "jsonparser" => Some("JSONParser"),
+        // Other utilities
+        "url" => Some("URL"),
+        "datetime" => Some("Datetime"),
+        "logginglevel" => Some("LoggingLevel"),
+        "accesslevel" => Some("AccessLevel"),
+        "continuation" => Some("Continuation"),
+        "location" => Some("Location"),
+        "pagereference" => Some("PageReference"),
+        // Primitives that are commonly used as static class references
+        // (but NOT Map/List/Set/String/Integer/etc. which are too often variable names)
+        _ => None,
+    };
+    if let Some(c) = canonical {
+        c.to_string()
+    } else {
+        normalize_namespace_prefix(value)
+    }
+}
+
 pub fn normalize_annotation_name(value: &str) -> &str {
     match value.to_lowercase().as_str() {
         "auraenabled" => "AuraEnabled",

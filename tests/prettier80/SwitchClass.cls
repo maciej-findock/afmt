@@ -17,7 +17,7 @@ class SwitchClass {
   public void switchTest() {
     Integer i = 1;
     Month s;
-    sObject randomObject;
+    SObject randomObject;
 
     switch on i {
       when 1 {

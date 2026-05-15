@@ -16,9 +16,9 @@ public class SimpleMethod {
 
   public String sayHelloWithDate() {
     SimpleMethod that = new SimpleMethod();
-    DateTime rightNow = that.getNow(),
+    Datetime rightNow = that.getNow(),
       tomorrow,
-      yesterday = DateTime.now().addDays(-1);
+      yesterday = Datetime.now().addDays(-1);
     return 'Hello at ' + now.format();
   }
 
@@ -35,8 +35,8 @@ public class SimpleMethod {
     return;
   }
 
-  private DateTime getNow() {
-    return DateTime.now();
+  private Datetime getNow() {
+    return Datetime.now();
   }
 
   void simpleBooleanExpressions() {
@@ -58,7 +58,7 @@ public class SimpleMethod {
     label='Insert Accounts'
     description='Inserts the accounts specified and returns the IDs of the new accounts.'
   )
-  public static List<ID> insertAccounts(List<Account> accounts) {
+  public static List<Id> insertAccounts(List<Account> accounts) {
     return null;
   }
 }
