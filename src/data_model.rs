@@ -1349,6 +1349,40 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 return;
             }
 
+            // First arg is below `(` but not all consecutive args have newlines between them —
+            // preserve the partial split (e.g. `f(\n  a, b,\n  c)` keeps a and b on one line).
+            // Only fires when at least one pair of consecutive args shares a line; if all args
+            // are on separate lines the general surround path handles it correctly.
+            if b.preserve_newlines()
+                && self.expressions.len() > 1
+                && !self.open_paren_hugging
+                && self.has_newline_between_args
+                && self.newline_before_arg[1..].iter().any(|&has_nl| !has_nl)
+            {
+                let inner = if docs.is_empty() {
+                    b.nil()
+                } else {
+                    let mut parts = Vec::with_capacity(docs.len() * 2 + 1);
+                    for (i, doc) in docs.iter().enumerate() {
+                        if i == 0 || self.newline_before_arg[i] {
+                            parts.push(b.indent(b.nl()));
+                            parts.push(b.indent(doc));
+                        } else {
+                            parts.push(b.txt(" "));
+                            parts.push(*doc);
+                        }
+                    }
+                    b.concat(parts)
+                };
+                let close = if self.close_paren_hugging {
+                    b.txt(")")
+                } else {
+                    b.concat(vec![b.nl(), b.txt(")")])
+                };
+                result.push(b.group(b.concat(vec![b.txt("("), inner, close])));
+                return;
+            }
+
             // If args stay inline as a list, but one arg contains its own multiline chain,
             // avoid adding surround()'s extra indent on top of the chain's continuation indent.
             if b.preserve_newlines()
