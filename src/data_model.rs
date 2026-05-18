@@ -1337,7 +1337,7 @@ impl<'a> DocBuild<'a> for ArgumentList {
                             parts.push(*doc);
                         } else if self.newline_before_arg[i] {
                             parts.push(b.indent(b.nl()));
-                            parts.push(b.indent(*doc));
+                            parts.push(b.indent(doc));
                         } else {
                             parts.push(b.txt(" "));
                             parts.push(*doc);
