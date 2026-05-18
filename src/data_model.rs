@@ -4488,12 +4488,11 @@ impl QueryExpression {
             QueryBody::Sosl(SoslQueryBody::new(node.c_by_k("sosl_query_body")))
         };
         let first_clause_hugs_bracket = match &query_body {
-            QueryBody::Soql(_) => {
-                node.try_c_by_k("soql_query_body")
-                    .and_then(|soql| soql.try_c_by_n("select_clause"))
-                    .map(|sel| sel.start_position().row == bracket_row)
-                    .unwrap_or(false)
-            }
+            QueryBody::Soql(_) => node
+                .try_c_by_k("soql_query_body")
+                .and_then(|soql| soql.try_c_by_n("select_clause"))
+                .map(|sel| sel.start_position().row == bracket_row)
+                .unwrap_or(false),
             QueryBody::Sosl(_) => false,
         };
         let close_bracket_hugs_last_clause = match &query_body {
@@ -4923,10 +4922,8 @@ impl SoqlQueryBody {
             .collect();
 
         let source = get_source_code();
-        let mut clause_nodes: Vec<Node> = vec![
-            node.c_by_n("select_clause"),
-            node.c_by_n("from_clause"),
-        ];
+        let mut clause_nodes: Vec<Node> =
+            vec![node.c_by_n("select_clause"), node.c_by_n("from_clause")];
         for &clause_name in &[
             "where_clause",
             "with_clause",
@@ -6747,10 +6744,7 @@ impl AndExpression {
         let and_at_end_of_line: Vec<bool> = std::iter::once(false)
             .chain(children.windows(2).map(|w| {
                 let between = &source[w[0].end_byte()..w[1].start_byte()];
-                match (
-                    between.find('\n'),
-                    between.to_ascii_lowercase().find("and"),
-                ) {
+                match (between.find('\n'), between.to_ascii_lowercase().find("and")) {
                     (Some(nl), Some(op)) => op < nl,
                     _ => false,
                 }
