@@ -4466,6 +4466,13 @@ pub struct QueryExpression {
     pub query_body: QueryBody,
     pub context: Option<ChainingContext>,
     pub is_multiline: bool,
+    // true when the first SOQL clause starts on the same row as the opening `[`
+    first_clause_hugs_bracket: bool,
+    // true when the closing `]` is on the same row as the last SOQL clause
+    close_bracket_hugs_last_clause: bool,
+    // true when this SOQL is the value of an enhanced for loop — needs double indent
+    // so loop body at +4 is visually distinct from SOQL clauses at +8
+    is_inside_for_loop: bool,
     pub node_context: NodeContext,
 }
 
@@ -4474,16 +4481,39 @@ impl QueryExpression {
         assert_check(node, "query_expression");
 
         let is_multiline = node.start_position().row != node.end_position().row;
+        let bracket_row = node.start_position().row;
         let query_body = if let Some(soql_node) = node.try_c_by_k("soql_query_body") {
             QueryBody::Soql(SoqlQueryBody::new(soql_node))
         } else {
             QueryBody::Sosl(SoslQueryBody::new(node.c_by_k("sosl_query_body")))
         };
+        let first_clause_hugs_bracket = match &query_body {
+            QueryBody::Soql(_) => node
+                .try_c_by_k("soql_query_body")
+                .and_then(|soql| soql.try_c_by_n("select_clause"))
+                .map(|sel| sel.start_position().row == bracket_row)
+                .unwrap_or(false),
+            QueryBody::Sosl(_) => false,
+        };
+        let close_bracket_hugs_last_clause = match &query_body {
+            QueryBody::Soql(_) => node
+                .try_c_by_k("soql_query_body")
+                .map(|soql| soql.end_position().row == node.end_position().row)
+                .unwrap_or(false),
+            QueryBody::Sosl(_) => false,
+        };
+        let is_inside_for_loop = node
+            .parent()
+            .map(|p| p.kind() == "enhanced_for_statement")
+            .unwrap_or(false);
 
         Self {
             query_body,
             context: build_chaining_context(&node),
             is_multiline,
+            first_clause_hugs_bracket,
+            close_bracket_hugs_last_clause,
+            is_inside_for_loop,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -4507,13 +4537,35 @@ impl<'a> DocBuild<'a> for QueryExpression {
 
                 result.push(b.group_concat(docs));
             } else if b.preserve_newlines() && self.is_multiline {
-                result.push(b.concat(vec![
-                    b.txt("["),
-                    b.indent(b.nl()),
-                    b.indent(self.query_body.build(b)),
-                    b.nl(),
-                    b.txt("]"),
-                ]));
+                let body = self.query_body.build(b);
+                let indented_body = if self.is_inside_for_loop {
+                    b.indent(b.indent(body))
+                } else {
+                    b.indent(body)
+                };
+                let first_nl = if self.is_inside_for_loop {
+                    b.indent(b.indent(b.nl()))
+                } else {
+                    b.indent(b.nl())
+                };
+                if self.first_clause_hugs_bracket {
+                    // source: [SELECT ... FROM ...\n WHERE ...]
+                    // keep first clause on same line as `[`, indent the rest
+                    let mut parts = vec![b.txt("["), indented_body];
+                    if !self.close_bracket_hugs_last_clause {
+                        parts.push(b.nl());
+                    }
+                    parts.push(b.txt("]"));
+                    result.push(b.concat(parts));
+                } else {
+                    // source: [\n    SELECT ... ]
+                    let mut parts = vec![b.txt("["), first_nl, indented_body];
+                    if !self.close_bracket_hugs_last_clause {
+                        parts.push(b.nl());
+                    }
+                    parts.push(b.txt("]"));
+                    result.push(b.concat(parts));
+                }
             } else {
                 let docs = vec![self.query_body.build(b)];
                 let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
@@ -4836,6 +4888,8 @@ pub struct SoqlQueryBody {
     //update_c;
     pub all_rows_clause: Option<AllRowsClause>,
     pub is_multiline: bool,
+    // per-clause flag: true when the source had a newline before that clause.
+    newline_before_clause: Vec<bool>,
     pub node_context: NodeContext,
 }
 
@@ -4861,10 +4915,37 @@ impl SoqlQueryBody {
         let all_rows_clause = node
             .try_c_by_n("all_rows_clause")
             .map(|n| AllRowsClause::new(n));
-        let for_clause = node
-            .try_cs_by_k("for_clause")
-            .into_iter()
-            .map(|n| ForClause::new(n))
+        let for_clause_nodes: Vec<Node> = node.try_cs_by_k("for_clause");
+        let for_clause = for_clause_nodes
+            .iter()
+            .map(|n| ForClause::new(*n))
+            .collect();
+
+        let source = get_source_code();
+        let mut clause_nodes: Vec<Node> =
+            vec![node.c_by_n("select_clause"), node.c_by_n("from_clause")];
+        for &clause_name in &[
+            "where_clause",
+            "with_clause",
+            "group_by_clause",
+            "order_by_clause",
+            "limit_clause",
+            "offset_clause",
+            "all_rows_clause",
+        ] {
+            if let Some(n) = node.try_c_by_n(clause_name) {
+                clause_nodes.push(n);
+            }
+        }
+        if let Some(&n) = for_clause_nodes.first() {
+            clause_nodes.push(n);
+        }
+        let newline_before_clause: Vec<bool> = std::iter::once(false)
+            .chain(
+                clause_nodes
+                    .windows(2)
+                    .map(|w| source[w[0].end_byte()..w[1].start_byte()].contains('\n')),
+            )
             .collect();
 
         Self {
@@ -4879,6 +4960,7 @@ impl SoqlQueryBody {
             for_clause,
             all_rows_clause,
             is_multiline,
+            newline_before_clause,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -4922,12 +5004,24 @@ impl<'a> DocBuild<'a> for SoqlQueryBody {
                 docs.push(for_clause_doc);
             }
 
-            let sep = if b.preserve_newlines() && self.is_multiline {
-                Insertable::new::<&str>(None, None, Some(b.nl()))
+            if b.preserve_newlines() && self.is_multiline {
+                let mut parts = Vec::with_capacity(docs.len() * 2);
+                for (i, &doc) in docs.iter().enumerate() {
+                    if i == 0 {
+                        parts.push(doc);
+                    } else if self.newline_before_clause[i] {
+                        parts.push(b.nl());
+                        parts.push(doc);
+                    } else {
+                        parts.push(b.txt(" "));
+                        parts.push(doc);
+                    }
+                }
+                result.push(b.concat(parts));
             } else {
-                Insertable::new::<&str>(None, None, Some(b.softline()))
-            };
-            result.push(b.intersperse(&docs, sep));
+                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                result.push(b.intersperse(&docs, sep));
+            }
         });
     }
 }
@@ -5367,8 +5461,15 @@ impl<'a> DocBuild<'a> for WhereClause {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             if b.preserve_newlines() && self.is_multiline {
-                let docs = vec![b.txt("WHERE "), self.boolean_exp.build_with_parent(b, None)];
-                result.push(b.concat(docs));
+                // Wrap the boolean expression in one indent level so that any line-broken
+                // AND/OR conditions land at WHERE+4 regardless of outer context indentation.
+                result.push(b.concat(vec![
+                    b.txt("WHERE"),
+                    b.indent(b.concat(vec![
+                        b.txt(" "),
+                        self.boolean_exp.build_with_parent(b, None),
+                    ])),
+                ]));
             } else {
                 let docs = vec![
                     b.txt("WHERE"),
@@ -6620,6 +6721,9 @@ impl<'a> DocBuild<'a> for StorageIdentifier {
 pub struct AndExpression {
     pub condition_exps: Vec<ConditionExpression>,
     pub is_multiline: bool,
+    newline_before_condition: Vec<bool>,
+    // true when the AND keyword precedes the newline in source (end-of-line style)
+    and_at_end_of_line: Vec<bool>,
     pub node_context: NodeContext,
 }
 
@@ -6628,8 +6732,25 @@ impl AndExpression {
         assert_check(node, "and_expression");
 
         let is_multiline = node.start_position().row != node.end_position().row;
-        let condition_exps = node
-            .children_vec()
+        let children = node.children_vec();
+        let source = get_source_code();
+        let newline_before_condition: Vec<bool> = std::iter::once(false)
+            .chain(
+                children
+                    .windows(2)
+                    .map(|w| source[w[0].end_byte()..w[1].start_byte()].contains('\n')),
+            )
+            .collect();
+        let and_at_end_of_line: Vec<bool> = std::iter::once(false)
+            .chain(children.windows(2).map(|w| {
+                let between = &source[w[0].end_byte()..w[1].start_byte()];
+                match (between.find('\n'), between.to_ascii_lowercase().find("and")) {
+                    (Some(nl), Some(op)) => op < nl,
+                    _ => false,
+                }
+            }))
+            .collect();
+        let condition_exps = children
             .into_iter()
             .map(|n| ConditionExpression::new(n))
             .collect();
@@ -6637,6 +6758,8 @@ impl AndExpression {
         Self {
             condition_exps,
             is_multiline,
+            newline_before_condition,
+            and_at_end_of_line,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -6650,12 +6773,30 @@ impl<'a> DocBuild<'a> for AndExpression {
                 .iter()
                 .map(|expr| expr.build_with_parent(b, Some("AND")))
                 .collect();
-            let sep = if b.preserve_newlines() && self.is_multiline {
-                Insertable::new(Some(b.nl()), Some("AND "), None)
+            if b.preserve_newlines() && self.is_multiline {
+                let mut parts = Vec::with_capacity(docs.len() * 2);
+                for (i, &doc) in docs.iter().enumerate() {
+                    if i == 0 {
+                        parts.push(doc);
+                    } else if self.newline_before_condition[i] {
+                        if self.and_at_end_of_line[i] {
+                            parts.push(b.txt(" AND"));
+                            parts.push(b.nl());
+                        } else {
+                            parts.push(b.nl());
+                            parts.push(b.txt("AND "));
+                        }
+                        parts.push(doc);
+                    } else {
+                        parts.push(b.txt(" AND "));
+                        parts.push(doc);
+                    }
+                }
+                result.push(b.concat(parts));
             } else {
-                Insertable::new(Some(b.softline()), Some("AND "), None)
-            };
-            result.push(b.intersperse(&docs, sep));
+                let sep = Insertable::new(Some(b.softline()), Some("AND "), None);
+                result.push(b.intersperse(&docs, sep));
+            }
         });
     }
 }
@@ -6664,6 +6805,8 @@ impl<'a> DocBuild<'a> for AndExpression {
 pub struct OrExpression {
     pub condition_exps: Vec<ConditionExpression>,
     pub is_multiline: bool,
+    newline_before_condition: Vec<bool>,
+    or_at_end_of_line: Vec<bool>,
     pub node_context: NodeContext,
 }
 
@@ -6672,8 +6815,25 @@ impl OrExpression {
         assert_check(node, "or_expression");
 
         let is_multiline = node.start_position().row != node.end_position().row;
-        let condition_exps = node
-            .children_vec()
+        let children = node.children_vec();
+        let source = get_source_code();
+        let newline_before_condition: Vec<bool> = std::iter::once(false)
+            .chain(
+                children
+                    .windows(2)
+                    .map(|w| source[w[0].end_byte()..w[1].start_byte()].contains('\n')),
+            )
+            .collect();
+        let or_at_end_of_line: Vec<bool> = std::iter::once(false)
+            .chain(children.windows(2).map(|w| {
+                let between = &source[w[0].end_byte()..w[1].start_byte()];
+                match (between.find('\n'), between.to_ascii_lowercase().find("or")) {
+                    (Some(nl), Some(op)) => op < nl,
+                    _ => false,
+                }
+            }))
+            .collect();
+        let condition_exps = children
             .into_iter()
             .map(|n| ConditionExpression::new(n))
             .collect();
@@ -6681,6 +6841,8 @@ impl OrExpression {
         Self {
             condition_exps,
             is_multiline,
+            newline_before_condition,
+            or_at_end_of_line,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -6694,12 +6856,30 @@ impl<'a> DocBuild<'a> for OrExpression {
                 .iter()
                 .map(|expr| expr.build_with_parent(b, Some("OR")))
                 .collect();
-            let sep = if b.preserve_newlines() && self.is_multiline {
-                Insertable::new(Some(b.nl()), Some("OR "), None)
+            if b.preserve_newlines() && self.is_multiline {
+                let mut parts = Vec::with_capacity(docs.len() * 2);
+                for (i, &doc) in docs.iter().enumerate() {
+                    if i == 0 {
+                        parts.push(doc);
+                    } else if self.newline_before_condition[i] {
+                        if self.or_at_end_of_line[i] {
+                            parts.push(b.txt(" OR"));
+                            parts.push(b.nl());
+                        } else {
+                            parts.push(b.nl());
+                            parts.push(b.txt("OR "));
+                        }
+                        parts.push(doc);
+                    } else {
+                        parts.push(b.txt(" OR "));
+                        parts.push(doc);
+                    }
+                }
+                result.push(b.concat(parts));
             } else {
-                Insertable::new(Some(b.softline()), Some("OR "), None)
-            };
-            result.push(b.intersperse(&docs, sep));
+                let sep = Insertable::new(Some(b.softline()), Some("OR "), None);
+                result.push(b.intersperse(&docs, sep));
+            }
         });
     }
 }
