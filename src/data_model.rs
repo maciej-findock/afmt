@@ -1191,9 +1191,11 @@ impl ArgumentList {
             vec![]
         } else {
             std::iter::once(false)
-                .chain(children.windows(2).map(|w| {
-                    source[w[0].end_byte()..w[1].start_byte()].contains('\n')
-                }))
+                .chain(
+                    children
+                        .windows(2)
+                        .map(|w| source[w[0].end_byte()..w[1].start_byte()].contains('\n')),
+                )
                 .collect()
         };
         let is_multiline = args_are_multiline
