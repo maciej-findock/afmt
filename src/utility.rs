@@ -74,6 +74,8 @@ pub fn normalize_apex_class_name(value: &str) -> Option<&'static str> {
         "sobject" => Some("SObject"),
         "sobjectfield" => Some("SObjectField"),
         "sobjecttype" => Some("SObjectType"),
+        // Exception
+        "exception" => Some("Exception"),
         // Core system classes
         "system" => Some("System"),
         "database" => Some("Database"),
