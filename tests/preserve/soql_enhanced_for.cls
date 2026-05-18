@@ -4,7 +4,7 @@ public class Test {
             SELECT Id, Name
             FROM Account
             WHERE Type = 'Customer'
-            AND BillingCountry in ('USA', 'UK', 'NL', 'DE')
+                AND BillingCountry in ('USA', 'UK', 'NL', 'DE')
         ]) {
             process(acc);
         }

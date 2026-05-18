@@ -1,0 +1,8 @@
+public class A {
+    Boolean m(String type, String subtype) {
+        return [SELECT COUNT() FROM Item__c
+                WHERE Object__c = 'Value' AND Active__c = true AND
+                        Type__c = :type AND SubType__c = :subtype
+                ] > 0;
+    }
+}
