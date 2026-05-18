@@ -1166,6 +1166,8 @@ pub struct ArgumentList {
     has_inline_multiline_chain_arg: bool,
     // true when the original source contains a newline between two top-level args.
     has_newline_between_args: bool,
+    // per-arg flag: true when the source had a newline before that argument.
+    newline_before_arg: Vec<bool>,
 }
 
 impl ArgumentList {
@@ -1185,6 +1187,15 @@ impl ArgumentList {
             .windows(2)
             .any(|w| source[w[0].end_byte()..w[1].start_byte()].contains('\n'));
         let has_newline_between_args = args_are_multiline;
+        let newline_before_arg: Vec<bool> = if children.is_empty() {
+            vec![]
+        } else {
+            std::iter::once(false)
+                .chain(children.windows(2).map(|w| {
+                    source[w[0].end_byte()..w[1].start_byte()].contains('\n')
+                }))
+                .collect()
+        };
         let is_multiline = args_are_multiline
             || children
                 .first()
@@ -1235,6 +1246,7 @@ impl ArgumentList {
             single_arg_is_chain,
             has_inline_multiline_chain_arg,
             has_newline_between_args,
+            newline_before_arg,
         }
     }
 }
@@ -1319,10 +1331,13 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 } else {
                     let mut parts = Vec::with_capacity(docs.len() * 2 - 1);
                     for (i, doc) in docs.iter().enumerate() {
-                        if i > 0 {
+                        if i == 0 {
+                            parts.push(*doc);
+                        } else if self.newline_before_arg[i] {
                             parts.push(b.indent(b.nl()));
-                            parts.push(b.indent(doc));
+                            parts.push(b.indent(*doc));
                         } else {
+                            parts.push(b.txt(" "));
                             parts.push(*doc);
                         }
                     }
