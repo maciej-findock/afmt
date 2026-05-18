@@ -1582,11 +1582,7 @@ impl<'a> DocBuild<'a> for BinaryExpression {
             // otherwise (is_a_chaining_inner_node with different-precedence parent,
             // or is_parent_return_statement):
             result.push(if b.preserve_newlines() && context.chain_is_multiline {
-                if context.is_parent_return_statement {
-                    b.group(b.indent(b.indent(inner)))
-                } else {
-                    b.group(b.indent(inner))
-                }
+                b.group(b.indent(inner))
             } else {
                 b.group_indent(inner)
             })
