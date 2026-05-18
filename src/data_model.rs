@@ -4468,6 +4468,11 @@ pub struct QueryExpression {
     pub is_multiline: bool,
     // true when the first SOQL clause starts on the same row as the opening `[`
     first_clause_hugs_bracket: bool,
+    // true when the closing `]` is on the same row as the last SOQL clause
+    close_bracket_hugs_last_clause: bool,
+    // true when this SOQL is the value of an enhanced for loop — needs double indent
+    // so loop body at +4 is visually distinct from SOQL clauses at +8
+    is_inside_for_loop: bool,
     pub node_context: NodeContext,
 }
 
@@ -4491,12 +4496,25 @@ impl QueryExpression {
             }
             QueryBody::Sosl(_) => false,
         };
+        let close_bracket_hugs_last_clause = match &query_body {
+            QueryBody::Soql(_) => node
+                .try_c_by_k("soql_query_body")
+                .map(|soql| soql.end_position().row == node.end_position().row)
+                .unwrap_or(false),
+            QueryBody::Sosl(_) => false,
+        };
+        let is_inside_for_loop = node
+            .parent()
+            .map(|p| p.kind() == "enhanced_for_statement")
+            .unwrap_or(false);
 
         Self {
             query_body,
             context: build_chaining_context(&node),
             is_multiline,
             first_clause_hugs_bracket,
+            close_bracket_hugs_last_clause,
+            is_inside_for_loop,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -4520,24 +4538,34 @@ impl<'a> DocBuild<'a> for QueryExpression {
 
                 result.push(b.group_concat(docs));
             } else if b.preserve_newlines() && self.is_multiline {
+                let body = self.query_body.build(b);
+                let indented_body = if self.is_inside_for_loop {
+                    b.indent(b.indent(body))
+                } else {
+                    b.indent(body)
+                };
+                let first_nl = if self.is_inside_for_loop {
+                    b.indent(b.indent(b.nl()))
+                } else {
+                    b.indent(b.nl())
+                };
                 if self.first_clause_hugs_bracket {
                     // source: [SELECT ... FROM ...\n WHERE ...]
                     // keep first clause on same line as `[`, indent the rest
-                    result.push(b.concat(vec![
-                        b.txt("["),
-                        b.indent(self.query_body.build(b)),
-                        b.nl(),
-                        b.txt("]"),
-                    ]));
+                    let mut parts = vec![b.txt("["), indented_body];
+                    if !self.close_bracket_hugs_last_clause {
+                        parts.push(b.nl());
+                    }
+                    parts.push(b.txt("]"));
+                    result.push(b.concat(parts));
                 } else {
                     // source: [\n    SELECT ... ]
-                    result.push(b.concat(vec![
-                        b.txt("["),
-                        b.indent(b.nl()),
-                        b.indent(self.query_body.build(b)),
-                        b.nl(),
-                        b.txt("]"),
-                    ]));
+                    let mut parts = vec![b.txt("["), first_nl, indented_body];
+                    if !self.close_bracket_hugs_last_clause {
+                        parts.push(b.nl());
+                    }
+                    parts.push(b.txt("]"));
+                    result.push(b.concat(parts));
                 }
             } else {
                 let docs = vec![self.query_body.build(b)];
