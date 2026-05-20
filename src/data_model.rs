@@ -1241,7 +1241,8 @@ impl ArgumentList {
         let single_arg_inline_but_spans_rows = children.len() == 1
             && open_paren_hugging
             && children[0].start_position().row != children[0].end_position().row
-            && children[0].kind() == "array_creation_expression";
+            && children[0].kind() == "array_creation_expression"
+            && same_line_nesting_depth >= 1;
         let has_inline_multiline_chain_arg = children.iter().any(|child| {
             child.start_position().row != child.end_position().row && Self::is_chain_node(child)
         });

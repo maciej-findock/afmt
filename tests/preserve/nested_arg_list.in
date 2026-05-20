@@ -18,5 +18,9 @@ public class Test {
         a.setMock(new A.MockList(new List<A.Mock> {
             new A.Mock(A.Method.DO, 200, body)
         }));
+
+        Foo helper = new Foo(new List<SObjectField> {
+            Obj__c.Field_A__c
+        });
     }
 }
