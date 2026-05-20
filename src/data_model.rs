@@ -562,6 +562,10 @@ pub struct ArrayInitializer {
     is_multiline: bool,
     item_row_breaks: Vec<bool>, // item_row_breaks[i] = true → break between item i and i+1
     is_inside_argument_list: bool,
+    // true when the parent argument_list has open_paren_hugging (the array_creation_expression
+    // starts on the same row as `(`). In that case the parent's surround() provides exactly
+    // one b.indent(); the array init must not add another or indentation doubles.
+    parent_arg_list_hugging: bool,
 }
 
 impl ArrayInitializer {
@@ -584,11 +588,22 @@ impl ArrayInitializer {
             .windows(2)
             .map(|w| w[0].end_position().row < w[1].start_position().row)
             .collect();
-        let grandparent_kind = node.parent().and_then(|p| p.parent()).map(|gp| gp.kind());
         // array_initializer -> array_creation_expression -> argument_list?
-        let is_inside_argument_list = grandparent_kind
-            .map(|k| k == "argument_list")
+        let grandparent = node.parent().and_then(|p| p.parent());
+        let is_inside_argument_list = grandparent
+            .map(|gp| gp.kind() == "argument_list")
             .unwrap_or(false);
+        // Does the parent argument_list have open_paren_hugging?
+        // i.e. does the array_creation_expression start on the same row as `(`?
+        // When true, the parent's surround() already provides one b.indent() and the
+        // array init must not add another. When false (list on next line), the parent's
+        // surround emits content at base+4 but the array init still needs its own +4.
+        let parent_arg_list_hugging = is_inside_argument_list
+            && node
+                .parent() // array_creation_expression
+                .zip(grandparent) // argument_list
+                .map(|(ace, al)| ace.start_position().row == al.start_position().row)
+                .unwrap_or(false);
 
         Self {
             initializers,
@@ -596,6 +611,7 @@ impl ArrayInitializer {
             is_multiline,
             item_row_breaks,
             is_inside_argument_list,
+            parent_arg_list_hugging,
         }
     }
 }
@@ -611,7 +627,8 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                 // keep items inline but preserve the { ... } block structure.
                 let sep = Insertable::new::<&str>(None, None, Some(b.txt(" ")));
                 let entries = b.intersperse(&docs, sep);
-                if self.is_inside_argument_list {
+                if self.is_inside_argument_list && self.parent_arg_list_hugging {
+                    // Parent's surround contributes exactly one b.indent(); no extra needed.
                     result.push(b.concat(vec![
                         b.txt("{"),
                         b.nl(),
@@ -631,11 +648,15 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
             } else if b.preserve_newlines() && has_row_breaks {
                 // Preserve the source row grouping: items sharing a row stay together.
                 // Commas are already in each item's NodeContext; we only add spacing.
-                // When inside an argument_list AND the first item is on a new line (is_multiline),
-                // the parent's surround() already contributes one b.indent(); mirror the
-                // !has_row_breaks path and use b.nl() / b.dedent so indentation doesn't stack.
-                // When is_multiline=false (first item inline), items that wrap still need +4.
-                let inside_arg = self.is_inside_argument_list && self.is_multiline;
+                // When inside an argument_list whose `(` is on the same row as the array
+                // creation expression (open_paren_hugging), the parent's surround already
+                // contributes one b.indent(); mirror the !has_row_breaks path and use b.nl()
+                // so indentation doesn't stack. When the list is on the next line (non-hugging),
+                // the array init must still add its own b.indent() to reach the correct depth.
+                // Also only applies when is_multiline (first item on a new line after {).
+                let inside_arg = self.is_inside_argument_list
+                    && self.is_multiline
+                    && self.parent_arg_list_hugging;
                 let mut parts = if self.is_multiline {
                     if inside_arg {
                         vec![b.txt("{"), b.nl()]

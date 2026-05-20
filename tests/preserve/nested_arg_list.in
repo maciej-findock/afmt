@@ -32,5 +32,12 @@ public class Test {
             Obj__c.Field_A__c,
             Obj__c.Field_B__c
         });
+
+        Factory f = new Factory(
+            new List<SObjectType> {
+                Account.SObjectType,
+                Contact.SObjectType
+            }
+        );
     }
 }
