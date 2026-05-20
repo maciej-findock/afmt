@@ -14,5 +14,9 @@ public class Test {
         outer(inner(new Map<String, Object> {
             'k' => true
         }));
+
+        a.setMock(new A.MockList(new List<A.Mock> {
+            new A.Mock(A.Method.DO, 200, body)
+        }));
     }
 }
