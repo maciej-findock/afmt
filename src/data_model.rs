@@ -631,27 +631,48 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
             } else if b.preserve_newlines() && has_row_breaks {
                 // Preserve the source row grouping: items sharing a row stay together.
                 // Commas are already in each item's NodeContext; we only add spacing.
+                // When inside an argument_list AND the first item is on a new line (is_multiline),
+                // the parent's surround() already contributes one b.indent(); mirror the
+                // !has_row_breaks path and use b.nl() / b.dedent so indentation doesn't stack.
+                // When is_multiline=false (first item inline), items that wrap still need +4.
+                let inside_arg = self.is_inside_argument_list && self.is_multiline;
                 let mut parts = if self.is_multiline {
-                    vec![b.txt("{"), b.indent(b.nl())]
+                    if inside_arg {
+                        vec![b.txt("{"), b.nl()]
+                    } else {
+                        vec![b.txt("{"), b.indent(b.nl())]
+                    }
                 } else {
                     vec![b.txt("{")]
                 };
                 for (i, doc) in docs.iter().enumerate() {
                     if self.is_multiline {
-                        parts.push(b.indent(doc));
+                        if inside_arg {
+                            parts.push(doc);
+                        } else {
+                            parts.push(b.indent(doc));
+                        }
                     } else {
                         parts.push(doc);
                     }
                     if i < docs.len() - 1 {
                         if self.item_row_breaks[i] {
-                            parts.push(b.indent(b.nl()));
+                            if inside_arg {
+                                parts.push(b.nl());
+                            } else {
+                                parts.push(b.indent(b.nl()));
+                            }
                         } else {
                             parts.push(b.txt(" "));
                         }
                     }
                 }
                 if self.is_multiline {
-                    parts.push(b.nl());
+                    if inside_arg {
+                        parts.push(b.dedent(b.nl()));
+                    } else {
+                        parts.push(b.nl());
+                    }
                 }
                 parts.push(b.txt("}"));
                 result.push(b.concat(parts));
