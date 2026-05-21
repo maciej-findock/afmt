@@ -72,22 +72,42 @@ pub struct ClassDeclaration {
     pub interface: Option<Interface>,
     pub body: ClassBody,
     pub node_context: NodeContext,
+    newline_before_superclass: bool,
+    newline_before_interface: bool,
 }
 
 impl ClassDeclaration {
     pub fn new(node: Node) -> Self {
         assert_check(node, "class_declaration");
 
+        let name_node = node.c_by_n("name");
+        let superclass_node = node.try_c_by_k("superclass");
+        let interface_node = node.try_c_by_k("interfaces");
+
+        let newline_before_superclass = superclass_node
+            .as_ref()
+            .is_some_and(|sc| sc.start_position().row > name_node.end_position().row);
+
+        let newline_before_interface = interface_node.as_ref().is_some_and(|iface| {
+            if let Some(ref sc) = superclass_node {
+                iface.start_position().row > sc.end_position().row
+            } else {
+                iface.start_position().row > name_node.end_position().row
+            }
+        });
+
         Self {
             modifiers: node.try_c_by_k("modifiers").map(|n| Modifiers::new(n)),
-            name: ValueNode::new(node.c_by_n("name")),
+            name: ValueNode::new(name_node),
             type_parameters: node
                 .try_c_by_k("type_parameters")
                 .map(|n| TypeParameters::new(n)),
-            superclass: node.try_c_by_k("superclass").map(|n| SuperClass::new(n)),
-            interface: node.try_c_by_k("interfaces").map(|n| Interface::new(n)),
+            superclass: superclass_node.map(|n| SuperClass::new(n)),
+            interface: interface_node.map(|n| Interface::new(n)),
             body: ClassBody::new(node.c_by_n("body")),
             node_context: NodeContext::with_punctuation(&node),
+            newline_before_superclass,
+            newline_before_interface,
         }
     }
 }
@@ -108,23 +128,44 @@ impl<'a> DocBuild<'a> for ClassDeclaration {
                 docs.push(n.build(b));
             }
 
-            if self.superclass.is_some() || self.interface.is_some() {
-                docs.push(b.softline());
-            }
+            let has_preserve_newlines =
+                self.newline_before_superclass || self.newline_before_interface;
 
-            if let Some(ref n) = self.superclass {
-                docs.push(n.build(b));
-                if self.interface.is_some() {
-                    docs.push(b.txt(" "));
+            if b.preserve_newlines() && has_preserve_newlines {
+                if let Some(ref n) = self.superclass {
+                    if self.newline_before_superclass {
+                        docs.push(b.indent(b.indent(b.concat(vec![b.nl(), n.build(b)]))));
+                    } else {
+                        docs.push(b.txt(" "));
+                        docs.push(n.build(b));
+                    }
                 }
+                if let Some(ref n) = self.interface {
+                    if self.newline_before_interface {
+                        docs.push(b.indent(b.indent(b.concat(vec![b.nl(), n.build(b)]))));
+                    } else {
+                        docs.push(b.txt(" "));
+                        docs.push(n.build(b));
+                    }
+                }
+                docs.push(b.txt(" "));
+                result.push(b.concat(docs));
+            } else {
+                if self.superclass.is_some() || self.interface.is_some() {
+                    docs.push(b.softline());
+                }
+                if let Some(ref n) = self.superclass {
+                    docs.push(n.build(b));
+                    if self.interface.is_some() {
+                        docs.push(b.txt(" "));
+                    }
+                }
+                if let Some(ref n) = self.interface {
+                    docs.push(n.build(b));
+                }
+                docs.push(b.txt(" "));
+                result.push(b.group_indent_concat(docs));
             }
-
-            if let Some(ref n) = self.interface {
-                docs.push(n.build(b));
-            }
-
-            docs.push(b.txt(" "));
-            result.push(b.group_indent_concat(docs));
 
             result.push(self.body.build(b));
         });

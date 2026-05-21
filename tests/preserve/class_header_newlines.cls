@@ -1,0 +1,27 @@
+public class A extends B implements I1, I2 {
+
+    void m() {
+    }
+}
+
+public class A extends B
+        implements I1, I2 {
+
+    void m() {
+    }
+}
+
+public class A
+        extends B
+        implements I1, I2 {
+
+    void m() {
+    }
+}
+
+public class A
+        implements I1, I2 {
+
+    void m() {
+    }
+}
