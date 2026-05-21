@@ -3475,6 +3475,9 @@ pub struct TernaryExpression {
     pub consequence: Expression,
     pub alternative: Expression,
     pub is_multiline: bool,
+    // true when this ternary is the alternative (`:` branch) of an outer ternary;
+    // in preserve mode it gets an extra indent so its `?`/`:` sit one level deeper
+    is_alternative_of_ternary: bool,
     pub node_context: NodeContext,
 }
 
@@ -3487,11 +3490,16 @@ impl TernaryExpression {
         let is_multiline =
             condition_node.end_position().row != consequence_node.start_position().row;
 
+        let is_alternative_of_ternary = node.parent().is_some_and(|p| {
+            p.kind() == "ternary_expression" && p.c_by_n("alternative").id() == node.id()
+        });
+
         Self {
             condition: Expression::new(condition_node),
             consequence: Expression::new(consequence_node),
             alternative: Expression::new(node.c_by_n("alternative")),
             is_multiline,
+            is_alternative_of_ternary,
             node_context: NodeContext::with_punctuation(&node),
         }
     }
@@ -3510,7 +3518,12 @@ impl<'a> DocBuild<'a> for TernaryExpression {
                     b.txt_(":"),
                     self.alternative.build(b),
                 ];
-                result.push(b.concat(docs));
+                let inner = b.concat(docs);
+                result.push(if self.is_alternative_of_ternary {
+                    b.indent(inner)
+                } else {
+                    inner
+                });
             } else {
                 let docs = vec![
                     self.condition.build(b),
