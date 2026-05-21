@@ -561,7 +561,11 @@ pub struct ArrayInitializer {
     pub node_context: NodeContext,
     is_multiline: bool,
     item_row_breaks: Vec<bool>, // item_row_breaks[i] = true → break between item i and i+1
-    is_inside_argument_list: bool,
+    // true when the array_creation_expression starts on the same row as its parent
+    // argument_list's `(`. The parent's surround() then provides exactly one b.indent()
+    // for the content; the array init must not add another or items double-indent.
+    // When false (list on the next line after `(`), the array init manages its own +4.
+    defers_indent_to_parent: bool,
 }
 
 impl ArrayInitializer {
@@ -584,10 +588,15 @@ impl ArrayInitializer {
             .windows(2)
             .map(|w| w[0].end_position().row < w[1].start_position().row)
             .collect();
-        let grandparent_kind = node.parent().and_then(|p| p.parent()).map(|gp| gp.kind());
         // array_initializer -> array_creation_expression -> argument_list?
-        let is_inside_argument_list = grandparent_kind
-            .map(|k| k == "argument_list")
+        // Defer when the array creation expression starts on the same row as `(`.
+        let defers_indent_to_parent = node
+            .parent() // array_creation_expression
+            .and_then(|ace| {
+                ace.parent()
+                    .filter(|gp| gp.kind() == "argument_list")
+                    .map(|al| ace.start_position().row == al.start_position().row)
+            })
             .unwrap_or(false);
 
         Self {
@@ -595,7 +604,7 @@ impl ArrayInitializer {
             node_context: NodeContext::with_punctuation(&node),
             is_multiline,
             item_row_breaks,
-            is_inside_argument_list,
+            defers_indent_to_parent,
         }
     }
 }
@@ -607,11 +616,10 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
             let has_row_breaks = self.item_row_breaks.iter().any(|&br| br);
 
             if b.preserve_newlines() && self.is_multiline && !has_row_breaks {
-                // First item on new line after {, all items on one source row —
-                // keep items inline but preserve the { ... } block structure.
+                // First item on new line after {, all items on one source row.
                 let sep = Insertable::new::<&str>(None, None, Some(b.txt(" ")));
                 let entries = b.intersperse(&docs, sep);
-                if self.is_inside_argument_list {
+                if self.defers_indent_to_parent {
                     result.push(b.concat(vec![
                         b.txt("{"),
                         b.nl(),
@@ -631,27 +639,46 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
             } else if b.preserve_newlines() && has_row_breaks {
                 // Preserve the source row grouping: items sharing a row stay together.
                 // Commas are already in each item's NodeContext; we only add spacing.
+                // defers_indent_to_parent&&is_multiline: parent already holds the one
+                // needed b.indent(); use b.nl()/b.dedent instead of adding another.
+                let defer = self.defers_indent_to_parent && self.is_multiline;
                 let mut parts = if self.is_multiline {
-                    vec![b.txt("{"), b.indent(b.nl())]
+                    if defer {
+                        vec![b.txt("{"), b.nl()]
+                    } else {
+                        vec![b.txt("{"), b.indent(b.nl())]
+                    }
                 } else {
                     vec![b.txt("{")]
                 };
                 for (i, doc) in docs.iter().enumerate() {
                     if self.is_multiline {
-                        parts.push(b.indent(doc));
+                        if defer {
+                            parts.push(doc);
+                        } else {
+                            parts.push(b.indent(doc));
+                        }
                     } else {
                         parts.push(doc);
                     }
                     if i < docs.len() - 1 {
                         if self.item_row_breaks[i] {
-                            parts.push(b.indent(b.nl()));
+                            if defer {
+                                parts.push(b.nl());
+                            } else {
+                                parts.push(b.indent(b.nl()));
+                            }
                         } else {
                             parts.push(b.txt(" "));
                         }
                     }
                 }
                 if self.is_multiline {
-                    parts.push(b.nl());
+                    if defer {
+                        parts.push(b.dedent(b.nl()));
+                    } else {
+                        parts.push(b.nl());
+                    }
                 }
                 parts.push(b.txt("}"));
                 result.push(b.concat(parts));
@@ -1161,6 +1188,10 @@ pub struct ArgumentList {
     // a method_invocation). Used to suppress surround()'s extra indent so only the chain's own
     // group_indent_concat contributes, giving consistent +4 at each level.
     single_arg_is_chain: bool,
+    // true when there is exactly one arg, it starts on the same row as `(`, and it spans
+    // multiple rows internally (e.g. new Foo(new List<T> { ... })). Surround's indent would
+    // stack with the arg's own inner indents, doubling indentation.
+    single_arg_inline_but_spans_rows: bool,
     // true when an inline argument list contains an argument whose own chained expression spans
     // rows. Used to avoid stacking surround()'s indent on top of the nested chain indent.
     has_inline_multiline_chain_arg: bool,
@@ -1234,6 +1265,11 @@ impl ArgumentList {
                     obj.kind() == "method_invocation" || obj.kind() == "object_creation_expression"
                 })
                 .unwrap_or(false);
+        let single_arg_inline_but_spans_rows = children.len() == 1
+            && open_paren_hugging
+            && children[0].start_position().row != children[0].end_position().row
+            && children[0].kind() == "array_creation_expression"
+            && same_line_nesting_depth >= 1;
         let has_inline_multiline_chain_arg = children.iter().any(|child| {
             child.start_position().row != child.end_position().row && Self::is_chain_node(child)
         });
@@ -1246,6 +1282,7 @@ impl ArgumentList {
             close_paren_hugging,
             same_line_nesting_depth,
             single_arg_is_chain,
+            single_arg_inline_but_spans_rows,
             has_inline_multiline_chain_arg,
             has_newline_between_args,
             newline_before_arg,
@@ -1317,6 +1354,16 @@ impl<'a> DocBuild<'a> for ArgumentList {
                     close_nl,
                     b.txt(")"),
                 ])));
+                return;
+            }
+
+            // Single arg starts inline after `(` but spans rows internally (e.g. a multiline
+            // list/map initializer). Bypass surround()'s indent so it doesn't stack with the
+            // arg's own inner indentation, which would double-indent items inside `{ }`.
+            if b.preserve_newlines() && self.single_arg_inline_but_spans_rows {
+                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                let inner = b.intersperse(&docs, sep);
+                result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));
                 return;
             }
 
@@ -1490,6 +1537,7 @@ pub struct BinaryExpressionContext {
     is_top_level_condition: bool, // direct child of an if/while/for condition parens
     is_inside_binary_paren: bool, // inside (...) that is directly inside another binary expression
     is_inside_argument_list: bool, // direct child of an argument_list; surround() there already provides indentation
+    is_rhs_on_new_line: bool, // direct child of variable_declarator where value starts after `=` row; declarator's b.indent() already provides indentation
 }
 
 #[derive(Debug)]
@@ -1533,6 +1581,10 @@ impl BinaryExpression {
         let is_inside_binary_paren = parent.kind() == "parenthesized_expression"
             && parent.parent().is_some_and(|gp| is_binary_exp(&gp));
         let is_inside_argument_list = parent.kind() == "argument_list";
+        let is_rhs_on_new_line = parent.kind() == "variable_declarator"
+            && parent
+                .try_c_by_k("assignment_operator")
+                .is_some_and(|op| node.start_position().row > op.start_position().row);
 
         BinaryExpressionContext {
             has_parent_same_precedence,
@@ -1545,6 +1597,7 @@ impl BinaryExpression {
             is_top_level_condition,
             is_inside_binary_paren,
             is_inside_argument_list,
+            is_rhs_on_new_line,
         }
     }
 
@@ -1606,6 +1659,9 @@ impl<'a> DocBuild<'a> for BinaryExpression {
                         b.group(b.indent(inner))
                     } else if context.is_inside_argument_list {
                         // argument_list surround() already contributes one indent level
+                        b.group(inner)
+                    } else if context.is_rhs_on_new_line {
+                        // variable_declarator already wrapped the RHS in b.indent()
                         b.group(inner)
                     } else {
                         b.group(b.indent(inner))
