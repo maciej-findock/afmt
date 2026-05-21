@@ -935,7 +935,8 @@ impl<'a> DocBuild<'a> for TriggerEventVariant {
 #[derive(Debug)]
 pub enum SelectClauseVariant {
     Count(CountExpression),
-    Selectable(Vec<SelectableExpression>),
+    // (expressions, row_breaks_between[i]=true means break between item i and i+1, is_multiline)
+    Selectable(Vec<SelectableExpression>, Vec<bool>, bool),
 }
 
 impl SelectClauseVariant {
@@ -945,11 +946,22 @@ impl SelectClauseVariant {
         if let Some(count_node) = node.try_c_by_k("count_expression") {
             Self::Count(CountExpression::new(count_node))
         } else {
+            let children = node.children_vec();
+            let row_breaks: Vec<bool> = children
+                .windows(2)
+                .map(|w| w[0].end_position().row != w[1].start_position().row)
+                .collect();
+            let is_multiline = children
+                .first()
+                .zip(children.last())
+                .is_some_and(|(first, last)| first.start_position().row != last.end_position().row);
             Self::Selectable(
-                node.children_vec()
+                children
                     .into_iter()
                     .map(|n| SelectableExpression::new(n))
                     .collect(),
+                row_breaks,
+                is_multiline,
             )
         }
     }
@@ -957,24 +969,44 @@ impl SelectClauseVariant {
 
 impl<'a> DocBuild<'a> for SelectClauseVariant {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
-        let mut doc_vec = Vec::new();
-        doc_vec.push(b.txt("SELECT"));
-        doc_vec.push(b.indent(b.softline()));
-
         match self {
             Self::Count(n) => {
-                doc_vec.push(n.build(b));
+                result.push(b.group_concat(vec![
+                    b.txt("SELECT"),
+                    b.indent(b.softline()),
+                    n.build(b),
+                ]));
             }
-            Self::Selectable(vec) => {
+            Self::Selectable(vec, row_breaks, is_multiline) => {
                 let docs = b.to_docs(vec);
-                let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
-                let doc = b.intersperse(&docs, sep);
 
-                let indented_join = b.indent(doc);
-                doc_vec.push(indented_join);
+                if b.preserve_newlines() && *is_multiline {
+                    // Preserve which fields the developer grouped on each line.
+                    // Fields on the same source row stay together; a row break
+                    // becomes b.nl() at the indented level.
+                    let mut parts = Vec::new();
+                    for (i, &doc) in docs.iter().enumerate() {
+                        parts.push(doc);
+                        if i < docs.len() - 1 {
+                            if row_breaks[i] {
+                                parts.push(b.nl());
+                            } else {
+                                parts.push(b.txt(" "));
+                            }
+                        }
+                    }
+                    result.push(b.concat(vec![b.txt("SELECT "), b.indent(b.concat(parts))]));
+                } else {
+                    let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
+                    let doc = b.intersperse(&docs, sep);
+                    result.push(b.group_concat(vec![
+                        b.txt("SELECT"),
+                        b.indent(b.softline()),
+                        b.indent(doc),
+                    ]));
+                }
             }
         }
-        result.push(b.group_concat(doc_vec));
     }
 }
 
