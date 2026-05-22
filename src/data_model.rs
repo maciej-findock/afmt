@@ -1487,6 +1487,33 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 return;
             }
 
+            // When this arg list's `(` shares a row with one ancestor arg list's `(`, the outer
+            // surround() already indents elements by +4. Adding our own indent() for the opening
+            // newline and elements gives +8 total ("double indent"). Instead, render args at the
+            // current indent (which is already +4 from the outer) and dedent the closing `)`.
+            if b.preserve_newlines()
+                && self.is_multiline
+                && self.same_line_nesting_depth == 1
+                && !self.open_paren_hugging
+            {
+                let sep_suf = if self.args_are_multiline {
+                    b.softline()
+                } else {
+                    b.txt(" ")
+                };
+                let sep = Insertable::new::<&str>(None, None, Some(sep_suf));
+                let inner = b.intersperse(&docs, sep);
+                result.push(b.group(b.concat(vec![
+                    b.force_break(),
+                    b.txt("("),
+                    b.maybeline(),
+                    inner,
+                    b.dedent(b.maybeline()),
+                    b.txt(")"),
+                ])));
+                return;
+            }
+
             // When args are on the same row in source, keep them inline with a space.
             let sep_suf = if b.preserve_newlines() && self.is_multiline && !self.args_are_multiline
             {
