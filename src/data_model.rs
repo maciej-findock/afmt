@@ -652,6 +652,16 @@ impl ArrayInitializer {
 
 impl<'a> DocBuild<'a> for ArrayInitializer {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
+        let bucket = get_comment_bucket(&self.node_context.id);
+        if !bucket.dangling_comments.is_empty() {
+            handle_pre_comments(b, bucket, result);
+            handle_dangling_comments_in_bracket_surround(b, bucket, result);
+            if let Some(ref n) = self.node_context.punc {
+                result.push(n.build(b));
+            }
+            return;
+        }
+
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.initializers);
             let has_row_breaks = self.item_row_breaks.iter().any(|&br| br);
@@ -970,6 +980,9 @@ pub struct ChainingContext {
     pub is_parent_a_chaining_node: bool,
     pub is_top_most_in_a_chain: bool,
     pub is_multiline: bool,
+    // True when the overall chain node spans multiple source rows — used by
+    // the top-most link to decide whether to wrap in group_indent_concat.
+    pub chain_is_multiline: bool,
 }
 
 #[derive(Debug)]
@@ -1061,6 +1074,14 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                         }
                     }
 
+                    // A comment between chain links (e.g. `// note\n.next()`) is
+                    // attached as a pre-comment of `name`. Emit it before the `.`
+                    // so the output is `// note\n.next()` not `.// note\nnext()`.
+                    let name_bucket = get_comment_bucket(&name.node_context.id);
+                    if !name_bucket.pre_comments.is_empty() {
+                        handle_pre_comments(b, name_bucket, &mut docs);
+                    }
+
                     docs.push(property_navigation.build(b));
 
                     if let Some(ref n) = type_arguments {
@@ -1071,7 +1092,7 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                     docs.push(arguments.build(b));
 
                     if context.is_top_most_in_a_chain {
-                        if preserve_flat_chain {
+                        if preserve_flat_chain && !context.chain_is_multiline {
                             return result.push(b.concat(docs));
                         }
                         return result.push(b.group_indent_concat(docs));
@@ -1082,6 +1103,12 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                     if b.preserve_newlines() && *is_newline_nav {
                         docs.push(b.nl());
                     }
+
+                    let name_bucket = get_comment_bucket(&name.node_context.id);
+                    if !name_bucket.pre_comments.is_empty() {
+                        handle_pre_comments(b, name_bucket, &mut docs);
+                    }
+
                     docs.push(property_navigation.build(b));
 
                     if let Some(ref n) = type_arguments {
@@ -5968,6 +5995,42 @@ impl MapInitializer {
 
 impl<'a> DocBuild<'a> for MapInitializer {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
+        let bucket = get_comment_bucket(&self.node_context.id);
+        if !bucket.dangling_comments.is_empty() {
+            handle_pre_comments(b, bucket, result);
+            let comment_docs = b.concat(handle_dangling_comments(b, bucket));
+            let doc = if self.is_inside_argument_list && self.arg_list_same_row {
+                let mut entries_nl = b.nl();
+                for _ in 0..self.same_line_nesting_depth {
+                    entries_nl = b.dedent(entries_nl);
+                }
+                let mut close_nl = b.nl();
+                for _ in 0..=self.same_line_nesting_depth {
+                    close_nl = b.dedent(close_nl);
+                }
+                b.concat(vec![
+                    b.txt("{"),
+                    entries_nl,
+                    comment_docs,
+                    close_nl,
+                    b.txt("}"),
+                ])
+            } else {
+                b.concat(vec![
+                    b.txt("{"),
+                    b.indent(b.nl()),
+                    b.indent(comment_docs),
+                    b.nl(),
+                    b.txt("}"),
+                ])
+            };
+            result.push(doc);
+            if let Some(ref n) = self.node_context.punc {
+                result.push(n.build(b));
+            }
+            return;
+        }
+
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.initializers);
 

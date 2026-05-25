@@ -1,0 +1,25 @@
+class A {
+    void m() {
+        // line comment between chain links
+        Builder b = new Builder('label', Type.A)
+            .withX(x).withY(y).withZ(z)
+            // these fields are optional but useful for debugging
+            .addItem('key1', val1).addItem('key2', val2);
+
+        // multiple consecutive comments between chain links
+        x.a().b()
+            // first comment
+            // second comment
+            .c().d();
+
+        // block comment between chain links
+        x.a().b()
+            /* block comment */
+            .c();
+
+        // comment at the very first nav (no chaining context, else branch)
+        SomeType result = SomeFactory
+            // choosing the right builder
+            .getInstance().build();
+    }
+}
