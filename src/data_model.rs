@@ -980,6 +980,9 @@ pub struct ChainingContext {
     pub is_parent_a_chaining_node: bool,
     pub is_top_most_in_a_chain: bool,
     pub is_multiline: bool,
+    // True when the overall chain node spans multiple source rows — used by
+    // the top-most link to decide whether to wrap in group_indent_concat.
+    pub chain_is_multiline: bool,
 }
 
 #[derive(Debug)]
@@ -1089,7 +1092,7 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                     docs.push(arguments.build(b));
 
                     if context.is_top_most_in_a_chain {
-                        if preserve_flat_chain {
+                        if preserve_flat_chain && !context.chain_is_multiline {
                             return result.push(b.concat(docs));
                         }
                         return result.push(b.group_indent_concat(docs));
