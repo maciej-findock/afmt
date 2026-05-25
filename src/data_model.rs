@@ -1071,6 +1071,14 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                         }
                     }
 
+                    // A comment between chain links (e.g. `// note\n.next()`) is
+                    // attached as a pre-comment of `name`. Emit it before the `.`
+                    // so the output is `// note\n.next()` not `.// note\nnext()`.
+                    let name_bucket = get_comment_bucket(&name.node_context.id);
+                    if !name_bucket.pre_comments.is_empty() {
+                        handle_pre_comments(b, name_bucket, &mut docs);
+                    }
+
                     docs.push(property_navigation.build(b));
 
                     if let Some(ref n) = type_arguments {
@@ -1092,6 +1100,12 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                     if b.preserve_newlines() && *is_newline_nav {
                         docs.push(b.nl());
                     }
+
+                    let name_bucket = get_comment_bucket(&name.node_context.id);
+                    if !name_bucket.pre_comments.is_empty() {
+                        handle_pre_comments(b, name_bucket, &mut docs);
+                    }
+
                     docs.push(property_navigation.build(b));
 
                     if let Some(ref n) = type_arguments {
