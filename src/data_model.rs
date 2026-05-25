@@ -652,6 +652,16 @@ impl ArrayInitializer {
 
 impl<'a> DocBuild<'a> for ArrayInitializer {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
+        let bucket = get_comment_bucket(&self.node_context.id);
+        if !bucket.dangling_comments.is_empty() {
+            handle_pre_comments(b, bucket, result);
+            handle_dangling_comments_in_bracket_surround(b, bucket, result);
+            if let Some(ref n) = self.node_context.punc {
+                result.push(n.build(b));
+            }
+            return;
+        }
+
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.initializers);
             let has_row_breaks = self.item_row_breaks.iter().any(|&br| br);
@@ -5968,6 +5978,36 @@ impl MapInitializer {
 
 impl<'a> DocBuild<'a> for MapInitializer {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
+        let bucket = get_comment_bucket(&self.node_context.id);
+        if !bucket.dangling_comments.is_empty() {
+            handle_pre_comments(b, bucket, result);
+            let comment_docs = b.concat(handle_dangling_comments(b, bucket));
+            let doc = if self.is_inside_argument_list && self.arg_list_same_row {
+                let mut entries_nl = b.nl();
+                for _ in 0..self.same_line_nesting_depth {
+                    entries_nl = b.dedent(entries_nl);
+                }
+                let mut close_nl = b.nl();
+                for _ in 0..=self.same_line_nesting_depth {
+                    close_nl = b.dedent(close_nl);
+                }
+                b.concat(vec![b.txt("{"), entries_nl, comment_docs, close_nl, b.txt("}")])
+            } else {
+                b.concat(vec![
+                    b.txt("{"),
+                    b.indent(b.nl()),
+                    b.indent(comment_docs),
+                    b.nl(),
+                    b.txt("}"),
+                ])
+            };
+            result.push(doc);
+            if let Some(ref n) = self.node_context.punc {
+                result.push(n.build(b));
+            }
+            return;
+        }
+
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             let docs = b.to_docs(&self.initializers);
 
