@@ -1,0 +1,11 @@
+public class A {
+    void m() {
+        return new Builder(ARG_ONE, ARG_TWO, false, new Set<String>{},
+            SomeHelper.listOfRules()
+                .add(SomeHelper.queryRule('RULE_A', SObject__c.Field__c, 'label')
+                    .query(Related__c.SObjectType, Related__c.Id)
+                    .build())
+                .toList()
+        );
+    }
+}
