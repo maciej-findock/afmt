@@ -277,6 +277,23 @@ impl<'a> DocBuild<'a> for FormalParameters {
                 return;
             }
 
+            if b.preserve_newlines() && self.is_multiline && !self.starts_inline && !has_row_breaks
+            {
+                // All params on the line below `(`, no row breaks between them.
+                // Double-indent so params are visually distinct from the method body.
+                let mut parts = vec![b.txt("(")];
+                parts.push(b.indent(b.indent(b.nl())));
+                for (i, doc) in parameters_doc.iter().enumerate() {
+                    if i > 0 {
+                        parts.push(b.txt(" "));
+                    }
+                    parts.push(*doc);
+                }
+                parts.push(b.txt(")"));
+                result.push(b.concat(parts));
+                return;
+            }
+
             let sep = Insertable::new::<&str>(None, None, Some(b.softline()));
             let open = Insertable::new(None, Some("("), Some(b.maybeline()));
             let close = Insertable::new(Some(b.maybeline()), Some(")"), None);
