@@ -6008,7 +6008,13 @@ impl<'a> DocBuild<'a> for MapInitializer {
                 for _ in 0..=self.same_line_nesting_depth {
                     close_nl = b.dedent(close_nl);
                 }
-                b.concat(vec![b.txt("{"), entries_nl, comment_docs, close_nl, b.txt("}")])
+                b.concat(vec![
+                    b.txt("{"),
+                    entries_nl,
+                    comment_docs,
+                    close_nl,
+                    b.txt("}"),
+                ])
             } else {
                 b.concat(vec![
                     b.txt("{"),
