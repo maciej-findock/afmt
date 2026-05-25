@@ -1454,10 +1454,10 @@ impl<'a> DocBuild<'a> for ArgumentList {
 
             // If the developer kept the first arg inline after `(` but moved a later arg onto
             // its own line, preserve that split instead of pulling later args back up.
+            // Two sub-cases: `)` hugging the last arg vs `)` on its own line.
             if b.preserve_newlines()
                 && self.expressions.len() > 1
                 && self.open_paren_hugging
-                && self.close_paren_hugging
                 && self.has_newline_between_args
             {
                 let inner = if docs.is_empty() {
@@ -1477,7 +1477,12 @@ impl<'a> DocBuild<'a> for ArgumentList {
                     }
                     b.concat(parts)
                 };
-                result.push(b.group(b.concat(vec![b.txt("("), inner, b.txt(")")])));
+                let close = if self.close_paren_hugging {
+                    b.txt(")")
+                } else {
+                    b.concat(vec![b.nl(), b.txt(")")])
+                };
+                result.push(b.group(b.concat(vec![b.txt("("), inner, close])));
                 return;
             }
 
