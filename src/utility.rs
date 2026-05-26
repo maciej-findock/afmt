@@ -40,7 +40,7 @@ pub fn normalize_managed_prefix(value: &str) -> String {
         if value.len() > plen + 2
             && value
                 .get(..plen)
-                .map_or(false, |s| s.eq_ignore_ascii_case(prefix))
+                .is_some_and(|s| s.eq_ignore_ascii_case(prefix))
             && value.as_bytes()[plen] == b'_'
             && value.as_bytes()[plen + 1] == b'_'
         {
