@@ -38,7 +38,7 @@ pub fn normalize_managed_prefix(value: &str) -> String {
     for prefix in prefixes {
         let plen = prefix.len();
         if value.len() > plen + 2
-            && value[..plen].eq_ignore_ascii_case(prefix)
+            && value.get(..plen).map_or(false, |s| s.eq_ignore_ascii_case(prefix))
             && value.as_bytes()[plen] == b'_'
             && value.as_bytes()[plen + 1] == b'_'
         {
