@@ -318,17 +318,30 @@ impl CommentMetadata {
             false
         };
 
-        // How many 4-space levels the comment sits to the left of its previous sibling.
-        let dedent_levels = if let Some(prev_node) = prev {
-            let prev_col = prev_node.start_position().column;
-            let comment_col = node.start_position().column;
-            if prev_col > comment_col {
-                ((prev_col - comment_col) / 4) as u32
-            } else {
-                0
+        // How many 4-space levels the comment sits to the left of its previous CODE sibling.
+        // Must skip extra nodes (other comments) so that an inline trailing comment on the
+        // preceding line doesn't become the column baseline — its start column is the position
+        // within that long line, which would produce a spuriously large dedent_levels value.
+        let prev_code_col = {
+            let mut cur = node.prev_sibling();
+            loop {
+                match cur {
+                    None => break None,
+                    Some(n) if !n.is_extra() => break Some(n.start_position().column),
+                    Some(n) => cur = n.prev_sibling(),
+                }
             }
-        } else {
-            0
+        };
+        let dedent_levels = match prev_code_col {
+            Some(prev_col) => {
+                let comment_col = node.start_position().column;
+                if prev_col > comment_col {
+                    ((prev_col - comment_col) / 4) as u32
+                } else {
+                    0
+                }
+            }
+            None => 0,
         };
 
         // True when the comment is on the same row as its parent's opening token.
