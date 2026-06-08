@@ -1628,6 +1628,7 @@ impl<'a> DocBuild<'a> for ArgumentList {
             } else if b.preserve_newlines()
                 && self.is_multiline
                 && self.same_line_nesting_depth == 1
+                && !self.outer_inline_chain_no_indent
             {
                 Some(b.dedent(b.maybeline()))
             } else {
