@@ -1284,6 +1284,12 @@ pub struct ArgumentList {
     has_newline_between_args: bool,
     // per-arg flag: true when the source had a newline before that argument.
     newline_before_arg: Vec<bool>,
+    // true when the nearest ancestor argument_list on the same row took the
+    // "inline chain" path (single chain arg starting on the same row as its `(`
+    // but spanning multiple rows). That path emits no b.indent(), so the
+    // depth-1 assumption "outer already provides +4" is wrong — we must fall
+    // through to group_surround_preserve and manage our own indentation.
+    outer_inline_chain_no_indent: bool,
 }
 
 impl ArgumentList {
@@ -1358,6 +1364,42 @@ impl ArgumentList {
         let has_inline_multiline_chain_arg = children.iter().any(|child| {
             child.start_position().row != child.end_position().row && Self::is_chain_node(child)
         });
+        // Walk to the nearest ancestor argument_list on the same row (skip the enclosing
+        // method_invocation/object_creation_expression node).
+        let outer_inline_chain_no_indent = node
+            .parent()
+            .and_then(|p| p.parent())
+            .filter(|anc| {
+                anc.kind() == "argument_list"
+                    && anc.start_position().row == node.start_position().row
+            })
+            .map(|outer_al| {
+                // Collect named, non-extra children of the outer arg list.
+                let mut outer_cursor = outer_al.walk();
+                let outer_children: Vec<_> = outer_al
+                    .named_children(&mut outer_cursor)
+                    .filter(|n| !n.is_extra())
+                    .collect();
+                // Outer took the "inline chain no-indent" path when:
+                // 1. It has exactly one argument,
+                // 2. That argument starts on the same row as the outer `(`,
+                // 3. That argument spans multiple rows (its end row != start row), and
+                // 4. That argument is a chained method_invocation (has an "object" child
+                //    that is itself a method_invocation or object_creation_expression).
+                // Under those conditions outer used `(inner)` with no b.indent(), so the
+                // depth-1 assumption ("outer already provides +4") does not hold.
+                outer_children.len() == 1
+                    && outer_children[0].start_position().row == outer_al.start_position().row
+                    && outer_children[0].end_position().row != outer_al.start_position().row
+                    && outer_children[0].kind() == "method_invocation"
+                    && outer_children[0]
+                        .child_by_field_name("object")
+                        .is_some_and(|obj| {
+                            obj.kind() == "method_invocation"
+                                || obj.kind() == "object_creation_expression"
+                        })
+            })
+            .unwrap_or(false);
         Self {
             expressions,
             node_context: NodeContext::with_punctuation(&node),
@@ -1371,6 +1413,7 @@ impl ArgumentList {
             has_inline_multiline_chain_arg,
             has_newline_between_args,
             newline_before_arg,
+            outer_inline_chain_no_indent,
         }
     }
 }
@@ -1544,6 +1587,7 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 && self.is_multiline
                 && self.same_line_nesting_depth == 1
                 && !self.open_paren_hugging
+                && !self.outer_inline_chain_no_indent
             {
                 let sep_suf = if self.args_are_multiline {
                     b.softline()
