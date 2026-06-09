@@ -1525,7 +1525,7 @@ impl<'a> DocBuild<'a> for ArgumentList {
                 } else {
                     b.concat(vec![b.nl(), b.txt(")")])
                 };
-                result.push(b.group(b.concat(vec![b.txt("("), inner, close])));
+                result.push(b.group(b.concat(vec![b.force_break(), b.txt("("), inner, close])));
                 return;
             }
 
