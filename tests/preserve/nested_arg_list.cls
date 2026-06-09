@@ -39,5 +39,14 @@ public class Test {
                 Contact.SObjectType
             }
         );
+
+        Recurring_Payment_Schedule__c rps = createRPS(DAILY,
+            Date.newInstance(2050, 1, 3),
+            Date.newInstance(3050, 1, 1),
+            new Recurring_Payment_Schedule__c(
+                Run_of_Days_before_Collection_date__c = 1,
+                cpm__Collection_Date_Conflict_Strategy__c = 'Next working day',
+                cpm__Run_Date_Conflict_Strategy__c = 'Previous working day'
+            ));
     }
 }
