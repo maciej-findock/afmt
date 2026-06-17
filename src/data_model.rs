@@ -1,6 +1,6 @@
 use crate::{
     accessor::Accessor,
-    context::{NodeContext, Punctuation},
+    context::{CommentType, NodeContext, Punctuation},
     doc::DocRef,
     doc_builder::{DocBuilder, Insertable},
     enum_def::*,
@@ -403,8 +403,37 @@ impl Modifiers {
 
 impl<'a> DocBuild<'a> for Modifiers {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
+        // Check if there is an inline line-comment post-comment on the modifiers node
+        // (e.g. `@SuppressWarnings('...') // explanation`). When present, the last
+        // annotation must be built WITHOUT its trailing nl() so that the post-comment
+        // is rendered inline before the newline rather than after it.
+        let bucket = get_comment_bucket(&self.node_context.id);
+        let has_inline_line_post = !self.annotations.is_empty()
+            && bucket.post_comments.last().is_some_and(|c| {
+                c.has_leading_content() && matches!(c.comment_type, CommentType::Line)
+            });
+
         build_with_comments(b, &self.node_context, result, |b, result| {
-            result.extend(self.annotations.iter().map(|n| n.build(b)));
+            if has_inline_line_post {
+                // Build all but the last annotation with the normal nl().
+                for ann in self.annotations.iter().take(self.annotations.len() - 1) {
+                    result.push(ann.build(b));
+                }
+                // Build the last annotation WITHOUT the trailing nl() so the inline
+                // post-comment (handled by build_with_comments below) lands before
+                // the line break instead of after it.
+                if let Some(ann) = self.annotations.last() {
+                    build_with_comments_and_punc(b, &ann.node_context, result, |b, result| {
+                        result.push(b.txt("@"));
+                        result.push(ann.name.build(b));
+                        if let Some(a) = &ann.arguments {
+                            result.push(a.build(b));
+                        }
+                    });
+                }
+            } else {
+                result.extend(self.annotations.iter().map(|n| n.build(b)));
+            }
 
             if !self.modifiers.is_empty() {
                 let docs = b.to_docs(&self.modifiers);
