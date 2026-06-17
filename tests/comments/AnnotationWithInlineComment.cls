@@ -1,0 +1,7 @@
+public class AnnotationWithInlineComment {
+  class Inner {
+    @SuppressWarnings('PMD.ExcessiveParameterList') //this object is only used for testing purposes
+    Inner(Id id, String status) {
+    }
+  }
+}
