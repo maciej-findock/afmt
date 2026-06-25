@@ -1,0 +1,41 @@
+public class MultilineString {
+  public void simple() {
+    String s = '''
+      Hello
+      World
+    ''';
+  }
+
+  public void jsonPayload() {
+    String newCustomerJson = '''
+        {
+            "Name" : "John Doe",
+            "Type" : "New Customer",
+            "Interests":
+                [
+                    {"id": "101", "sportName: "biking"},
+                    {"id": "102", "sportName: "running"},
+                    {"id": "103", "sportName: "football"}
+                ]
+        }''';
+  }
+
+  public void templateAndAssert() {
+    String formatted =
+      '''
+        {
+            "Account": "${accountName}",
+            "Last Updated": "${date}"
+        }'''.template(
+        new Map<String, Object> {
+          'accountName' => 'My Account',
+          'date' => Datetime.newInstance(2018, 11, 15)
+        }
+      );
+    Assert.areEqual('''
+        {
+            "Account": "My Account",
+            "Last Updated": "2018-11-15 08:00:00"
+        }''', formatted);
+  }
+}

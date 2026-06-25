@@ -236,7 +236,7 @@ impl Formatter {
         let mut last_error_node = Some(*node);
 
         for i in 0..node.child_count() {
-            if let Some(child) = node.child(i) {
+            if let Some(child) = node.child(i as u32) {
                 if child.has_error() {
                     last_error_node = Self::find_last_error_node(&child);
                 }
