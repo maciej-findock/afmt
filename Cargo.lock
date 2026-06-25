@@ -258,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "sf-afmt"
-version = "0.15.15"
+version = "0.16.0"
 dependencies = [
  "clap",
  "serde",
