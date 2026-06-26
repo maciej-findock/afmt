@@ -21,7 +21,7 @@ clap = "4.5.16"
 toml = "0.8.19"
 typed-arena = "2.0.2"
 tree-sitter = "0.26.9"
-tree-sitter-sfapex = { git = "https://github.com/maciej-findock/tree-sitter-sfapex", rev = "679cc32" }
+tree-sitter-sfapex = { git = "https://github.com/maciej-findock/tree-sitter-sfapex", rev = "1ba6e1f" }
 
 [profile.dev]
 opt-level = 1
