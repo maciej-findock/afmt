@@ -1558,7 +1558,7 @@ impl<'a> DocBuild<'a> for ArgumentList {
                             if self.first_arg_is_chain {
                                 parts.push(*doc);
                             } else {
-                                parts.push(b.indent(*doc));
+                                parts.push(b.indent(doc));
                             }
                         } else if self.newline_before_arg[i] {
                             parts.push(b.indent(b.nl()));

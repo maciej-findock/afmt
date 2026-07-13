@@ -1550,7 +1550,7 @@ impl DateLiteralWithParam {
 impl<'a> DocBuild<'a> for DateLiteralWithParam {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt(format!("{}:{}", &self.date_literal, &self.param)));
+            result.push(b.txt(format!("{}:{}", self.date_literal, self.param)));
         });
     }
 }
