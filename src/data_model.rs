@@ -1302,6 +1302,8 @@ pub struct ArgumentList {
     // a method_invocation). Used to suppress surround()'s extra indent so only the chain's own
     // group_indent_concat contributes, giving consistent +4 at each level.
     single_arg_is_chain: bool,
+    // true when the first arg is a chained method call, regardless of total arg count.
+    first_arg_is_chain: bool,
     // true when there is exactly one arg, it starts on the same row as `(`, and it spans
     // multiple rows internally (e.g. new Foo(new List<T> { ... })). Surround's indent would
     // stack with the arg's own inner indents, doubling indentation.
@@ -1385,6 +1387,13 @@ impl ArgumentList {
                     obj.kind() == "method_invocation" || obj.kind() == "object_creation_expression"
                 })
                 .unwrap_or(false);
+        // true when the first arg (regardless of arg count) is itself a chained method call.
+        // Chains manage their own multi-level indentation via group_indent_concat, so the
+        // "first arg stays inline, later arg splits" branch must not add its own indent() on
+        // top of that — only object_creation_expression-style first args need it.
+        let first_arg_is_chain = children
+            .first()
+            .is_some_and(|first| Self::is_chain_node(first));
         let single_arg_inline_but_spans_rows = children.len() == 1
             && open_paren_hugging
             && children[0].start_position().row != children[0].end_position().row
@@ -1438,6 +1447,7 @@ impl ArgumentList {
             close_paren_hugging,
             same_line_nesting_depth,
             single_arg_is_chain,
+            first_arg_is_chain,
             single_arg_inline_but_spans_rows,
             has_inline_multiline_chain_arg,
             has_newline_between_args,
@@ -1538,7 +1548,18 @@ impl<'a> DocBuild<'a> for ArgumentList {
                     let mut parts = Vec::with_capacity(docs.len() * 2 - 1);
                     for (i, doc) in docs.iter().enumerate() {
                         if i == 0 {
-                            parts.push(*doc);
+                            // The first arg stays inline after `(`, but if it spans multiple
+                            // rows itself (e.g. a multiline object_creation_expression), its
+                            // nested argument_list assumes an ancestor already contributed one
+                            // indent level (same_line_nesting_depth >= 2 bypasses its own
+                            // indent()). Without this indent() here, that assumption breaks and
+                            // re-formatting an already-formatted file dedents the nested body.
+                            // Chains are exempt: they manage their own indentation internally.
+                            if self.first_arg_is_chain {
+                                parts.push(*doc);
+                            } else {
+                                parts.push(b.indent(doc));
+                            }
                         } else if self.newline_before_arg[i] {
                             parts.push(b.indent(b.nl()));
                             parts.push(b.indent(doc));
