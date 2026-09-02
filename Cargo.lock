@@ -258,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "sf-afmt"
-version = "0.16.1"
+version = "0.16.2"
 dependencies = [
  "clap",
  "serde",
@@ -360,8 +360,9 @@ checksum = "c199356c799a8945965bb5f2c55b2ad9d9aa7c4b4f6e587fe9dea0bc715e5f9c"
 
 [[package]]
 name = "tree-sitter-sfapex"
-version = "3.0.0"
-source = "git+https://github.com/maciej-findock/tree-sitter-sfapex?rev=1ba6e1f#1ba6e1f217656a07509f494d0c5bea8bd386162e"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e902b5d7951d1477ff43ad5ec8b2e6adae029cce593a770c64e10362ee7dec7b"
 dependencies = [
  "cc",
  "tree-sitter-language",

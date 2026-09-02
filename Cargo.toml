@@ -1,6 +1,6 @@
 [package]
 name = "sf-afmt"
-version = "0.16.1"
+version = "0.16.2"
 edition = "2021"
 description = "Salesforce Apex formatter — FinDock edition"
 license = "MIT OR Apache-2.0"
@@ -21,7 +21,7 @@ clap = "4.5.16"
 toml = "0.8.19"
 typed-arena = "2.0.2"
 tree-sitter = "0.26.9"
-tree-sitter-sfapex = { git = "https://github.com/maciej-findock/tree-sitter-sfapex", rev = "1ba6e1f" }
+tree-sitter-sfapex = "3.0.1"
 
 [profile.dev]
 opt-level = 1
