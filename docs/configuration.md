@@ -27,6 +27,9 @@ controls the logical indentation width; with tabs, it is the number of columns
 represented by each indentation level. Line wrapping uses that logical width
 when applying `max_width`.
 
+`max_width = 0` disables line-width wrapping entirely: afmt never breaks a
+line to fit a width, regardless of how long it gets.
+
 `javadoc_star_column` controls only the leading star on continuation lines in
 Javadoc (`/** ... */`) comments:
 
