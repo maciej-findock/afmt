@@ -653,6 +653,11 @@ pub struct ArrayInitializer {
     // for the content; the array init must not add another or items double-indent.
     // When false (list on the next line after `(`), the array init manages its own +4.
     defers_indent_to_parent: bool,
+    // true when this array initializer is the value of an enhanced for loop — needs
+    // double indent so the loop body at +4 is visually distinct from the items at +8.
+    is_inside_for_loop: bool,
+    // true when the closing `}` is on the same row as the last item
+    close_brace_hugs_last_item: bool,
 }
 
 impl ArrayInitializer {
@@ -685,6 +690,16 @@ impl ArrayInitializer {
                     .map(|al| ace.start_position().row == al.start_position().row)
             })
             .unwrap_or(false);
+        // array_initializer -> array_creation_expression -> enhanced_for_statement?
+        let is_inside_for_loop = node
+            .parent() // array_creation_expression
+            .and_then(|ace| ace.parent())
+            .map(|gp| gp.kind() == "enhanced_for_statement")
+            .unwrap_or(false);
+        let close_brace_hugs_last_item = children
+            .last()
+            .map(|n| n.end_position().row == node.end_position().row)
+            .unwrap_or(false);
 
         Self {
             initializers,
@@ -692,6 +707,8 @@ impl ArrayInitializer {
             is_multiline,
             item_row_breaks,
             defers_indent_to_parent,
+            is_inside_for_loop,
+            close_brace_hugs_last_item,
         }
     }
 }
@@ -739,11 +756,19 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                 // defers_indent_to_parent&&is_multiline: parent already holds the one
                 // needed b.indent(); use b.nl()/b.dedent instead of adding another.
                 let defer = self.defers_indent_to_parent && self.is_multiline;
+                let double = self.is_inside_for_loop;
+                let indent_doc = |doc: DocRef<'a>| {
+                    if double {
+                        b.indent(b.indent(doc))
+                    } else {
+                        b.indent(doc)
+                    }
+                };
                 let mut parts = if self.is_multiline {
                     if defer {
                         vec![b.txt("{"), b.nl()]
                     } else {
-                        vec![b.txt("{"), b.indent(b.nl())]
+                        vec![b.txt("{"), indent_doc(b.nl())]
                     }
                 } else {
                     vec![b.txt("{")]
@@ -753,7 +778,7 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                         if defer {
                             parts.push(doc);
                         } else {
-                            parts.push(b.indent(doc));
+                            parts.push(indent_doc(doc));
                         }
                     } else {
                         parts.push(doc);
@@ -763,7 +788,7 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                             if defer {
                                 parts.push(b.nl());
                             } else {
-                                parts.push(b.indent(b.nl()));
+                                parts.push(indent_doc(b.nl()));
                             }
                         } else {
                             parts.push(b.txt(" "));
@@ -773,7 +798,7 @@ impl<'a> DocBuild<'a> for ArrayInitializer {
                 if self.is_multiline {
                     if defer {
                         parts.push(b.dedent(b.nl()));
-                    } else {
+                    } else if !self.close_brace_hugs_last_item {
                         parts.push(b.nl());
                     }
                 }
